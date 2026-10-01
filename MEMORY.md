@@ -8,6 +8,8 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Claves en localStorage (con prefijo `diario-estudio-`): `sesiones`, `tema`, `usuarios`,
   `sesion`, `login-intentos`. Si alguna vez se listan sin prefijo, es un error.
 - Todo en `index.html` + `styles.css` + `app.js`. Sin build, sin dependencias, sin tests en el repo.
+- Versionado: `git init` + rama `master` (orphan) apuntando a `https://github.com/Feirt00/Agentes.git`.
+  En ese repo `main` contiene otra cosa: no mezclarla ni borrarla.
 
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic (`file://`).
