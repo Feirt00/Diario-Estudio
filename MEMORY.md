@@ -10,6 +10,8 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Todo en `index.html` + `styles.css` + `app.js`. Sin build, sin dependencias, sin tests en el repo.
 - Versionado: `git init` + rama `master` (orphan) apuntando a `https://github.com/Feirt00/Agentes.git`.
   En ese repo `main` contiene otra cosa: no mezclarla ni borrarla.
+- GitHub Desktop descartado: se versiona con git por CLI y se revisa en la web. Si algún día se
+  abre ahí, hay que ponerse en la rama `master`; `main` NO es este proyecto.
 
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic (`file://`).
