@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diario de Estudio</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Diario de Estudio</h1>
+            <div class="header-actions">
+                <span id="auth-status" class="auth-status"></span>
+                <button id="theme-toggle" class="theme-btn" title="Cambiar tema">🌙</button>
+            </div>
+        </div>
+
+        <!-- Racha -->
+        <div class="streak-box">
+            <span class="streak-number" id="streak">0</span>
+            <span class="streak-label">días de racha 🔥</span>
+            <div class="streak-best">
+                <span class="streak-best-number" id="best-streak">0</span>
+                <span class="streak-best-label">mejor racha 🏆</span>
+            </div>
+        </div>
+
+        <!-- Formulario -->
+        <form id="study-form">
+            <div class="form-group">
+                <label for="date">Fecha</label>
+                <input type="date" id="date" required>
+            </div>
+            <div class="form-group">
+                <label for="topic">Tema</label>
+                <input type="text" id="topic" placeholder="¿Qué estudiaste?" required>
+            </div>
+            <div class="form-group">
+                <label for="minutes">Minutos</label>
+                <input type="number" id="minutes" min="1" placeholder="30" required>
+            </div>
+            <button type="submit">Registrar sesión</button>
+        </form>
+
+        <!-- Lista de sesiones -->
+        <h2>Sesiones</h2>
+        <ul id="session-list"></ul>
+
+        <!-- Términos y Condiciones -->
+        <div class="terms">
+            <h3>Términos y Condiciones</h3>
+            <p>1. Esta aplicación es una herramienta personal de registro de estudio.</p>
+            <p>2. Los datos se almacenan únicamente en tu navegador (localStorage).</p>
+            <p>3. No se recopila ni se envía información a terceros.</p>
+            <p>4. El uso de esta aplicación es bajo tu propia responsabilidad.</p>
+            <p>5. Puedes eliminar tus datos en cualquier momento borrando los datos del navegador.</p>
+        </div>
+    </div>
+
+    <!-- Modal de acceso -->
+    <div id="auth-modal" class="modal" hidden>
+        <div class="modal-content">
+            <button id="auth-close" class="modal-close" type="button" title="Cerrar">✕</button>
+            <h2 id="auth-title">Iniciar sesión</h2>
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="auth-username">Usuario</label>
+                    <input type="text" id="auth-username" placeholder="Tu nombre de usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Contraseña</label>
+                    <input type="password" id="auth-password" placeholder="Mínimo 6 caracteres" required>
+                </div>
+                <p id="auth-message" class="auth-message" hidden></p>
+                <button type="submit" id="auth-submit">Entrar</button>
+            </form>
+            <p class="auth-toggle">
+                <span id="auth-toggle-text">¿No tienes cuenta?</span>
+                <a id="auth-toggle-link" href="#">Crear usuario</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
