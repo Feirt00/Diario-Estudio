@@ -492,6 +492,13 @@ function formatMinutes(minutes)
     return value + ' min';
 }
 
+// Borrado en dos pasos (sin confirm() ni alert()): el primer clic en la 🗑️
+// "arma" el botón (clase "armada" y texto "¿Borrar?") y el segundo borra.
+// Solo puede haber UN botón armado a la vez: al armar uno nuevo se desarma
+// el anterior y se limpia su temporizador. El estado vive aquí, no en el DOM,
+// porque los botones se repintan enteros en updateSessionList().
+let borradoPendiente = { boton: null, temporizador: null };
+
 // Crear el <li> de una sesión. Los datos van con textContent para que
 // un tema con "<" o comillas no rompa el HTML.
 function createSessionItem(session)
@@ -510,9 +517,23 @@ function createSessionItem(session)
     minutes.className = 'session-minutes';
     minutes.textContent = formatMinutes(session.minutes);
 
+    // El aria-label es estático: los datos del usuario nunca van en atributos.
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'session-delete';
+    deleteButton.setAttribute('aria-label', 'Borrar sesión');
+    deleteButton.textContent = '🗑️';
+
+    // deleteSession() decide si armar o borrar según el estado del botón.
+    deleteButton.addEventListener('click', () =>
+    {
+        deleteSession(session, deleteButton);
+    });
+
     item.appendChild(date);
     item.appendChild(topic);
     item.appendChild(minutes);
+    item.appendChild(deleteButton);
 
     return item;
 }
@@ -603,6 +624,15 @@ if (listaFiltroSelect)
 // (la más reciente primero) y el resto de la app no se entera.
 function updateSessionList()
 {
+    // Al repintar, los botones viejos (y su botón armado) desaparecen: se
+    // limpia el estado para que no quede un temporizador de 4 s apuntando a
+    // un botón suelto que ya no está en la página.
+    if (borradoPendiente.boton)
+    {
+        clearTimeout(borradoPendiente.temporizador);
+        borradoPendiente = { boton: null, temporizador: null };
+    }
+
     const sessions = loadSessions();
 
     sessions.sort((a, b) => b.date.localeCompare(a.date));
@@ -625,6 +655,90 @@ function updateSessionList()
     {
         sessionList.appendChild(createSessionItem(session));
     }
+}
+
+// Borrar la sesión de una fila de la lista, con confirmación en dos pasos.
+// Recibe la sesión que se pintó en esa fila y el botón 🗑️ de la propia fila.
+//
+// Primer clic: se arma el botón (clase "armada", texto "¿Borrar?") y se
+// pone un temporizador de 4 s que lo desarma solo. Si ya había otro botón
+// armado, se desarma ese primero: solo puede haber UNO a la vez.
+//
+// Segundo clic en el mismo botón: se borra. Se carga la lista RECIÉN
+// guardada (loadSessions) y se busca la sesión por VALOR —misma fecha,
+// mismo tema y mismos minutos— no por posición, porque el repintado y el
+// filtro cambian el orden y puede haber duplicadas indistinguibles. Se
+// elimina UNA sola aparición (la primera coincidencia) y se guarda.
+function deleteSession(session, boton)
+{
+    const esElBotonArmado = borradoPendiente.boton === boton;
+
+    // Segundo clic en el botón armado: toca borrar de verdad.
+    if (esElBotonArmado)
+    {
+        // Se desarma antes de tocar los datos: si el guardado falla y se
+        // repinta, no debe quedar ningún temporizador corriendo.
+        clearTimeout(borradoPendiente.temporizador);
+        borradoPendiente = { boton: null, temporizador: null };
+
+        // Lista fresca del almacenamiento (no la copia de cuando se pintó):
+        // otra pestaña o el formulario pueden haber guardado entretanto.
+        const sessions = loadSessions();
+
+        const index = sessions.findIndex((s) =>
+            s.date === session.date &&
+            s.topic === session.topic &&
+            Number(s.minutes) === Number(session.minutes)
+        );
+
+        // La sesión ya no está guardada (la borró otra pestaña, p. ej.):
+        // no se toca nada y se repinta la lista para que refleje lo guardado.
+        if (index === -1)
+        {
+            refreshCurrentUserViews();
+            return;
+        }
+
+        // splice quita SOLO la primera coincidencia: si hay duplicadas
+        // exactas, cada clic borra una.
+        sessions.splice(index, 1);
+
+        const result = saveSessions(sessions);
+
+        if (!result.ok)
+        {
+            // El borrado no se quedó: se avisa en la interfaz (nunca con
+            // alert()) y la lista vuelve a pintar lo que hay guardado.
+            showFormMessage(result.message, 'error');
+        }
+
+        // Éxito o error: la lista, la racha, los totales y los gráficos se
+        // repintan desde lo guardado. Que la fila desaparezca ya es el
+        // aviso de que se borró: no hace falta un mensaje de éxito.
+        refreshCurrentUserViews();
+        return;
+    }
+
+    // Primer clic: se desarma el botón anterior (si lo había) y se arma este.
+    if (borradoPendiente.boton)
+    {
+        clearTimeout(borradoPendiente.temporizador);
+        borradoPendiente.boton.classList.remove('armada');
+        borradoPendiente.boton.textContent = '🗑️';
+    }
+
+    boton.classList.add('armada');
+    boton.textContent = '¿Borrar?';
+
+    borradoPendiente.boton = boton;
+    borradoPendiente.temporizador = setTimeout(() =>
+    {
+        // A los 4 s el botón se desarma solo: si el segundo clic no llega,
+        // no se borra nada por accidente.
+        boton.classList.remove('armada');
+        boton.textContent = '🗑️';
+        borradoPendiente = { boton: null, temporizador: null };
+    }, 4000);
 }
 
 // Repintar todo lo que depende de las sesiones guardadas.
