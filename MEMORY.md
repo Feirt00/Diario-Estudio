@@ -10,7 +10,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Sigue abierto **por diseño y sin arreglo posible** sin backend: C1/C2 (rate limit reseteable), C7 (la sesión no caduca), C8 (la app no está protegida), B3 residual (suplantar a un usuario que sí existe).
 - Tres pestañas (Diario, Cronómetro, Gráficos) y apartado "🤖 Agentes" (array `AGENTS` en `app.js`).
 - Claves en localStorage (prefijo `diario-estudio-`): `sesiones`, `sesiones-<usuario>`, `tema`, `usuarios`, `sesion`, `login-intentos`, `cronometro`. Sin prefijo es un error.
-- Versionado: rama `master` (orphan) → `https://github.com/Feirt00/Agentes.git`. En ese repo `main` es otra cosa: no mezclarla ni borrarla. Nada está subido todavía: los commits son locales.
+- Versionado: rama `master` → `https://github.com/Feirt00/Agentes.git`, **ya subida** (sincronizada en v1.8) junto con la rama `agentes-de-la-web` (copia del mismo punto, creada a petición de Feirt para tener el proyecto web aparte). En ese repo `main` es otra cosa: no mezclarla ni borrarla.
 
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic (`file://`).
