@@ -1109,3 +1109,233 @@ body.dark .top-minutes
 {
     color: #aab4ff;
 }
+
+/* ---------- Gráfico de barras: cabecera, navegación y detalle ---------- */
+
+/* Cabecera del gráfico de barras: el título y los botones para mover la ventana */
+.chart-head
+{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.chart-head h3
+{
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.chart-nav
+{
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+    /* Si el título ocupa toda la línea los botones bajan a la siguiente:
+       así se quedan pegados a la derecha y no a la izquierda */
+    margin-left: auto;
+}
+
+/* Botones "‹" y "›": tamaño fijo para que se puedan pulsar en el móvil */
+.chart-nav-button
+{
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    font-family: inherit;
+    font-size: 1.3em;
+    line-height: 1;
+    color: #667eea;
+    background-color: #f0f2ff;
+    border: 1px solid #d9ddff;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.chart-nav-button:hover:not(:disabled)
+{
+    background-color: #e2e6ff;
+}
+
+.chart-nav-button:focus-visible
+{
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+/* Apagado: la ventana ya llega a hoy y no se puede ver el futuro */
+.chart-nav-button:disabled
+{
+    opacity: 0.35;
+    cursor: default;
+}
+
+body.dark .chart-nav-button
+{
+    color: #aab4ff;
+    background-color: #1d2f57;
+    border-color: #2b4278;
+}
+
+body.dark .chart-nav-button:hover:not(:disabled)
+{
+    background-color: #26406f;
+}
+
+/* Una columna de un día en el gráfico de barras: se puede pulsar */
+.chart-day
+{
+    cursor: pointer;
+}
+
+/* Área que se puede pulsar: ocupa toda la columna */
+.chart-day-area
+{
+    fill: transparent;
+}
+
+.chart-day:hover .chart-day-area
+{
+    fill: rgba(102, 126, 234, 0.12);
+}
+
+.chart-day:focus-visible
+{
+    outline: 2px solid #667eea;
+    outline-offset: 1px;
+}
+
+.chart-day:focus-visible .chart-day-area
+{
+    fill: rgba(102, 126, 234, 0.18);
+    stroke: #667eea;
+    stroke-width: 2;
+}
+
+/* La barra del día seleccionado se pinta de otro color */
+.chart-day.is-selected .chart-bar
+{
+    fill: #ff6b6b;
+}
+
+.chart-day.is-selected .chart-day-area
+{
+    fill: rgba(102, 126, 234, 0.12);
+}
+
+body.dark .chart-day:hover .chart-day-area
+{
+    fill: rgba(139, 157, 255, 0.16);
+}
+
+body.dark .chart-day:focus-visible
+{
+    outline: 2px solid #8b9dff;
+    outline-offset: 1px;
+}
+
+body.dark .chart-day:focus-visible .chart-day-area
+{
+    fill: rgba(139, 157, 255, 0.22);
+    stroke: #8b9dff;
+}
+
+body.dark .chart-day.is-selected .chart-bar
+{
+    fill: #ff8f8f;
+}
+
+/* Detalle del día que se ha pulsado en el gráfico de barras */
+.chart-detail
+{
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid #e6e8f5;
+    border-radius: 12px;
+    background-color: #f8f9ff;
+}
+
+/* Sin esto el detalle seguiría visible: la regla de arriba gana al [hidden] */
+.chart-detail[hidden]
+{
+    display: none;
+}
+
+body.dark .chart-detail
+{
+    border-color: #24406e;
+    background-color: #182a4d;
+}
+
+.chart-detail-title
+{
+    margin: 0 0 8px;
+    font-size: 0.95em;
+    color: #444;
+}
+
+body.dark .chart-detail-title
+{
+    color: #e0e0e0;
+}
+
+.chart-detail-list
+{
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.chart-detail-item
+{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid #e9ebf7;
+    font-size: 0.9em;
+}
+
+body.dark .chart-detail-item
+{
+    border-bottom-color: #24406e;
+}
+
+.chart-detail-topic
+{
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.chart-detail-minutes
+{
+    color: #667eea;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+body.dark .chart-detail-minutes
+{
+    color: #aab4ff;
+}
+
+.chart-detail-total
+{
+    margin: 10px 0 0;
+    font-size: 0.85em;
+    color: #888;
+}
+
+.chart-detail-empty
+{
+    margin: 0;
+    font-size: 0.9em;
+    color: #888;
+}

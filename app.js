@@ -33,6 +33,8 @@ const authToggleText = document.getElementById('auth-toggle-text');
 const authToggleLink = document.getElementById('auth-toggle-link');
 
 // Claves para localStorage
+// STORAGE_KEY es la clave global de las sesiones: se usa cuando no hay sesión
+// iniciada. Con sesión iniciada cada usuario tiene la suya (ver getSessionsKey()).
 const STORAGE_KEY = 'diario-estudio-sesiones';
 const THEME_KEY = 'diario-estudio-tema';
 const USERS_KEY = 'diario-estudio-usuarios';
@@ -211,17 +213,40 @@ function normalizeSession(session)
     return { date: session.date, topic: session.topic, minutes: minutes };
 }
 
-// Cargar sesiones desde localStorage.
-// Nunca falla: si el JSON está corrupto o una sesión no tiene la forma
-// esperada, esa sesión se descarta y la app sigue funcionando.
-function loadSessions()
+// Clave de localStorage donde se guardan las sesiones del usuario actual.
+// Sin sesión iniciada se usa la clave global ("diario-estudio-sesiones").
+// Con sesión iniciada cada usuario tiene la suya: se le añade su "usernameKey"
+// ("diario-estudio-sesiones-ana"). Así dos usuarios del mismo navegador no
+// comparten sesiones, ni racha, ni totales, ni gráficos.
+function getSessionsKey()
+{
+    const user = getCurrentUser();
+
+    if (!user || typeof user !== 'object' || typeof user.username !== 'string')
+    {
+        return STORAGE_KEY;
+    }
+
+    const key = usernameKey(user.username);
+
+    if (key === '')
+    {
+        return STORAGE_KEY;
+    }
+
+    return STORAGE_KEY + '-' + key;
+}
+
+// Convertir lo que hay guardado en una lista de sesiones válidas.
+// Si el JSON está corrupto o no es una lista, se devuelve una lista vacía:
+// la app nunca se cae por datos guardados.
+function parseSessions(rawData)
 {
     let parsed;
 
     try
     {
-        const data = storageGet(STORAGE_KEY);
-        parsed = data ? JSON.parse(data) : [];
+        parsed = rawData ? JSON.parse(rawData) : [];
     }
     catch (error)
     {
@@ -252,12 +277,54 @@ function loadSessions()
     return sessions;
 }
 
+// Migrar las sesiones de la clave global a la clave del usuario.
+// Se hace UNA sola vez: cuando un usuario entra por primera vez y su clave
+// propia todavía no existe, lo que había en la clave global pasa a su clave
+// y la global se vacía (así ninguna sesión se queda duplicada en las dos).
+function migrateSessionsToUser(userKey)
+{
+    // Sin sesión iniciada no hay nada que migrar: todo sigue en la clave global.
+    if (userKey === STORAGE_KEY) return false;
+
+    // Si el usuario ya tiene su clave (aunque esté vacía), sus sesiones ya
+    // están separadas: no se vuelve a tocar la global.
+    if (storageGet(userKey) !== null) return false;
+
+    const globalSessions = parseSessions(storageGet(STORAGE_KEY));
+
+    // La clave global no existe o no tiene sesiones: no hay nada que mover.
+    if (globalSessions.length === 0) return false;
+
+    if (!storageSet(userKey, JSON.stringify(globalSessions))) return false;
+
+    // La global se vacía: cada sesión está en una sola clave.
+    storageSet(STORAGE_KEY, '[]');
+
+    return true;
+}
+
+// Cargar sesiones desde localStorage.
+// Nunca falla: si el JSON está corrupto o una sesión no tiene la forma
+// esperada, esa sesión se descarta y la app sigue funcionando.
+function loadSessions()
+{
+    const key = getSessionsKey();
+
+    // Si el usuario entra por primera vez, lo que había en la clave global
+    // pasa a su clave.
+    migrateSessionsToUser(key);
+
+    return parseSessions(storageGet(key));
+}
+
 // Guardar sesiones en localStorage.
 // Devuelve { ok, message } y nunca lanza errores: si el navegador rechaza
 // la escritura (cuota llena, almacenamiento bloqueado) se avisa con un mensaje.
 function saveSessions(sessions)
 {
-    if (!storageSet(STORAGE_KEY, JSON.stringify(sessions)))
+    const key = getSessionsKey();
+
+    if (!storageSet(key, JSON.stringify(sessions)))
     {
         const isQuotaExceeded = storageLastError && storageLastError.name === 'QuotaExceededError';
         const message = isQuotaExceeded
@@ -476,14 +543,32 @@ function updateSessionList()
     }
 }
 
+// Repintar todo lo que depende de las sesiones guardadas.
+// La llama Zeirt al iniciar y al cerrar sesión: al cambiar de usuario, la
+// racha, la mejor racha, el total de la semana, la lista y los gráficos
+// tienen que cambiar también.
+function refreshCurrentUserViews()
+{
+    updateStreak();
+    updateBestStreak();
+    updateWeekTotal();
+    updateSessionList();
+
+    // Los gráficos se redibujan si la función existe (la aporta el agente de gráficos)
+    if (typeof renderCharts === 'function')
+    {
+        renderCharts();
+    }
+}
+
 // Los agentes del proyecto: quién es y qué está haciendo.
 // El reparto detallado y el protocolo de delegación están en `manageste.md`.
 const AGENTS = [
     { name: 'Zeirt', role: 'Agente principal', task: 'Verifica, integra y documenta', status: 'terminado' },
-    { name: 'Guardian de los Datos', role: 'Agente 1', task: 'Robustez de datos y validaciones', status: 'terminado' },
+    { name: 'Guardian de los Datos', role: 'Agente 1', task: 'Sesiones por usuario y migración', status: 'terminado' },
     { name: 'Criptógrafo del Acceso', role: 'Agente 2', task: 'Hash, contraseñas y sesión', status: 'terminado' },
     { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'terminado' },
-    { name: 'Analista de Datos', role: 'Agente 4', task: 'Gráficos de estudio en SVG', status: 'terminado' }
+    { name: 'Analista de Datos', role: 'Agente 4', task: 'Ventana de días y detalle por día', status: 'terminado' }
 ];
 
 // Pintar el apartado de agentes
@@ -1221,6 +1306,9 @@ function logoutUser()
 {
     clearSession();
     renderAuthStatus();
+
+    // Al salir se vuelve a la lista global (la que no tiene cuenta).
+    refreshCurrentUserViews();
 }
 
 // ---------- Eventos ----------
@@ -1286,6 +1374,11 @@ authForm.addEventListener('submit', async (e) =>
     {
         setAuthMessage(result.message, 'success');
         renderAuthStatus();
+
+        // Al entrar, las sesiones pasan a la cuenta del usuario (si las tenía
+        // sin cuenta) y la vista se repinta con sus datos.
+        refreshCurrentUserViews();
+
         authCloseTimer = setTimeout(closeAuthModal, 600);
     }
     else
@@ -1697,6 +1790,36 @@ const CHART_WEEKS = 8;
 const CHART_MAX_TOPICS = 5;
 const CHART_COLOR_COUNT = 6;
 
+// --- Estado del gráfico de barras ---
+
+// Desplazamiento de la ventana de días respecto a la de por defecto.
+// 0 = los últimos 7 días hasta hoy. Cada botón mueve la ventana 7 días.
+let chartDaysOffset = 0;
+
+// Día seleccionado en el gráfico de barras (fecha "AAAA-MM-DD" o texto vacío)
+let chartSelectedDay = '';
+
+// Clave de sesiones del usuario que se está viendo. Si cambia (es decir, si
+// entra o sale otro usuario), la ventana vuelve a la de por defecto y el
+// detalle seleccionado se borra: no se mezclan datos de dos usuarios.
+let chartSessionsKey = getSessionsKey();
+
+// Botones para mover la ventana de días del gráfico de barras
+const chartDaysPreviousButton = document.getElementById('chart-dias-anterior');
+const chartDaysNextButton = document.getElementById('chart-dias-siguiente');
+
+if (chartDaysPreviousButton)
+{
+    // Hacia atrás: los 7 días anteriores
+    chartDaysPreviousButton.addEventListener('click', () => moveChartDays(CHART_DAYS));
+}
+
+if (chartDaysNextButton)
+{
+    // Hacia delante: los 7 días siguientes (sin llegar al futuro)
+    chartDaysNextButton.addEventListener('click', () => moveChartDays(-CHART_DAYS));
+}
+
 // --- Utilidades para dibujar ---
 
 // Crear un elemento del SVG con sus atributos
@@ -1767,6 +1890,36 @@ function formatChartDayNumber(date)
 function formatChartWeekRange(week)
 {
     return 'del ' + formatChartDayNumber(week.monday) + ' al ' + formatChartDayNumber(week.sunday);
+}
+
+// Fecha larga de un día: "13 de octubre"
+function formatChartDayLong(date)
+{
+    return date.getDate() + ' de ' + date.toLocaleDateString('es-ES', { month: 'long' });
+}
+
+// Nombre completo de un día: "Martes 13 de octubre"
+function formatChartDayFullName(date)
+{
+    const weekday = date.toLocaleDateString('es-ES', { weekday: 'long' });
+    const weekdayName = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+
+    return weekdayName + ' ' + formatChartDayLong(date);
+}
+
+// Rango de días que se está viendo: "del 6 al 12 de octubre"
+function formatChartDaysRange(firstDay, lastDay)
+{
+    const sameMonth = firstDay.getFullYear() === lastDay.getFullYear()
+        && firstDay.getMonth() === lastDay.getMonth();
+
+    if (sameMonth)
+    {
+        const month = lastDay.toLocaleDateString('es-ES', { month: 'long' });
+        return 'del ' + firstDay.getDate() + ' al ' + lastDay.getDate() + ' de ' + month;
+    }
+
+    return 'del ' + formatChartDayLong(firstDay) + ' al ' + formatChartDayLong(lastDay);
 }
 
 // Nombre de un tema: si viene vacío se pone algo legible
@@ -1844,17 +1997,19 @@ function getMondayOf(date)
     return monday;
 }
 
-// Minutos de cada uno de los últimos 7 días (hoy incluido).
+// Minutos de cada uno de los 7 días que se están viendo.
+// El desplazamiento mueve la ventana: 0 son los últimos 7 días hasta hoy,
+// 7 son los 7 días anteriores, 14 los anteriores a esos...
 // Los días sin sesiones se quedan a cero: así se ve la ausencia.
-function getDailyMinutes(sessions)
+function getDailyMinutes(sessions, offset)
 {
     const days = [];
     const today = parseLocalDate(getTodayLocal());
 
-    for (let offset = CHART_DAYS - 1; offset >= 0; offset--)
+    for (let position = CHART_DAYS - 1; position >= 0; position--)
     {
         const date = new Date(today.getTime());
-        date.setDate(date.getDate() - offset);
+        date.setDate(date.getDate() - position - offset);
         days.push({ date: date, key: toLocalDateString(date), minutes: 0 });
     }
 
@@ -1941,11 +2096,20 @@ function getTopicSlices(sessions)
 
 // --- Gráfico de barras: minutos por día ---
 
-function renderBarChart(container, sessions)
+// Texto que se lee al llegar a una barra con el teclado
+function formatChartDayAriaLabel(day)
+{
+    const minutes = day.minutes > 0
+        ? formatChartMinutes(day.minutes) + ' minutos'
+        : 'sin minutos registrados';
+
+    return formatChartDayFullName(day.date) + ': ' + minutes + '. Ver el detalle del día';
+}
+
+function renderBarChart(container, days)
 {
     container.textContent = '';
 
-    const days = getDailyMinutes(sessions);
     const width = 320;
     const height = 210;
     const paddingLeft = 8;
@@ -1966,11 +2130,15 @@ function renderBarChart(container, sessions)
         }
     }
 
+    // El SVG no lleva role="img" porque ahora las barras se pueden pulsar:
+    // con role="img" el navegador no expone el interior del dibujo.
+    // Se usa role="group" para que cada barra conserve su nombre accesible.
     const svg = createSvgElement('svg', {
         'viewBox': '0 0 ' + width + ' ' + height,
-        'role': 'img'
+        'role': 'group',
+        'aria-label': 'Minutos estudiados por día'
     });
-    addSvgTooltip(svg, 'Minutos estudiados por día en los últimos ' + CHART_DAYS + ' días');
+    addSvgTooltip(svg, 'Minutos estudiados por día');
 
     // Línea de la base
     svg.appendChild(createSvgElement('line', {
@@ -1989,20 +2157,42 @@ function renderBarChart(container, sessions)
         const barX = centerX - barWidth / 2;
         const barY = baseline - barHeight;
 
-        const bar = createSvgElement('rect', {
+        // Un <g> por día: se puede pulsar con el ratón y con el teclado
+        // (Tab para llegar, Enter o Espacio para activar).
+        const group = createSvgElement('g', {
+            'class': 'chart-day' + (day.key === chartSelectedDay ? ' is-selected' : ''),
+            'tabindex': '0',
+            'role': 'button',
+            'aria-label': formatChartDayAriaLabel(day),
+            'data-chart-day': day.key
+        });
+
+        // El <title> va el primero: es el tooltip del ratón y el nombre accesible
+        addSvgTooltip(group, formatChartWeekday(day.date) + ' ' + formatChartDayNumber(day.date)
+            + ': ' + formatChartMinutes(day.minutes) + ' min');
+
+        // Área sensible: ocupa toda la columna para que también se pueda pulsar
+        // en los días sin sesiones (su barra tiene altura 0)
+        group.appendChild(createSvgElement('rect', {
+            'x': barX,
+            'y': topSpace,
+            'width': barWidth,
+            'height': plotHeight,
+            'class': 'chart-day-area'
+        }));
+
+        // La barra visible
+        group.appendChild(createSvgElement('rect', {
             'x': barX,
             'y': barY,
             'width': barWidth,
             'height': barHeight,
             'rx': 3,
             'class': 'chart-bar'
-        });
-        addSvgTooltip(bar, formatChartWeekday(day.date) + ' ' + formatChartDayNumber(day.date)
-            + ': ' + formatChartMinutes(day.minutes) + ' min');
-        svg.appendChild(bar);
+        }));
 
         // Marca del día en la base: también aparece en los días sin sesiones
-        svg.appendChild(createSvgElement('rect', {
+        group.appendChild(createSvgElement('rect', {
             'x': barX,
             'y': baseline,
             'width': barWidth,
@@ -2011,7 +2201,7 @@ function renderBarChart(container, sessions)
         }));
 
         // Minutos encima de la barra
-        svg.appendChild(createSvgText(formatChartMinutes(day.minutes), {
+        group.appendChild(createSvgText(formatChartMinutes(day.minutes), {
             'x': centerX,
             'y': barY - 6,
             'class': 'chart-value',
@@ -2019,21 +2209,238 @@ function renderBarChart(container, sessions)
         }));
 
         // Etiqueta del día: nombre del día y fecha local
-        svg.appendChild(createSvgText(formatChartWeekday(day.date), {
+        group.appendChild(createSvgText(formatChartWeekday(day.date), {
             'x': centerX,
             'y': baseline + 16,
             'class': 'chart-label',
             'text-anchor': 'middle'
         }));
-        svg.appendChild(createSvgText(formatChartDayNumber(day.date), {
+        group.appendChild(createSvgText(formatChartDayNumber(day.date), {
             'x': centerX,
             'y': baseline + 29,
             'class': 'chart-label',
             'text-anchor': 'middle'
         }));
+
+        group.addEventListener('click', () => toggleChartDay(day.key));
+        group.addEventListener('keydown', (event) =>
+        {
+            if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar')
+            {
+                event.preventDefault();
+                toggleChartDay(day.key);
+            }
+        });
+
+        svg.appendChild(group);
     }
 
     container.appendChild(svg);
+}
+
+// --- Ventana de días y detalle del día ---
+
+// Título del gráfico de barras: dice qué días se están viendo
+function getChartDaysTitle(days)
+{
+    if (chartDaysOffset === 0)
+    {
+        return 'Minutos por día (últimos ' + CHART_DAYS + ' días)';
+    }
+
+    if (days.length === 0)
+    {
+        return 'Minutos por día';
+    }
+
+    return 'Minutos por día (' + formatChartDaysRange(days[0].date, days[days.length - 1].date) + ')';
+}
+
+// El botón de adelante se apaga cuando la ventana ya llega a hoy:
+// así no se puede ver el futuro.
+function updateChartNavButtons()
+{
+    if (!chartDaysNextButton) return;
+
+    chartDaysNextButton.disabled = chartDaysOffset <= 0;
+}
+
+// Pinta debajo del gráfico qué se estudió el día seleccionado
+function renderChartDetail(container, sessions)
+{
+    container.textContent = '';
+
+    if (chartSelectedDay === '')
+    {
+        container.hidden = true;
+        return;
+    }
+
+    const daySessions = sessions.filter(session => session.date === chartSelectedDay);
+
+    const title = document.createElement('h4');
+    title.className = 'chart-detail-title';
+    title.textContent = formatChartDayFullName(parseLocalDate(chartSelectedDay));
+    container.appendChild(title);
+
+    if (daySessions.length === 0)
+    {
+        const empty = document.createElement('p');
+        empty.className = 'chart-detail-empty';
+        empty.textContent = 'Ese día no registraste ninguna sesión.';
+        container.appendChild(empty);
+        container.hidden = false;
+        return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'chart-detail-list';
+
+    let totalMinutes = 0;
+
+    for (const session of daySessions)
+    {
+        totalMinutes += session.minutes;
+
+        const item = document.createElement('li');
+        item.className = 'chart-detail-item';
+
+        const topic = document.createElement('span');
+        topic.className = 'chart-detail-topic';
+        topic.textContent = getTopicLabel(session.topic);
+
+        const minutes = document.createElement('span');
+        minutes.className = 'chart-detail-minutes';
+        minutes.textContent = formatChartMinutes(session.minutes) + ' min';
+
+        item.appendChild(topic);
+        item.appendChild(minutes);
+        list.appendChild(item);
+    }
+
+    container.appendChild(list);
+
+    const total = document.createElement('p');
+    total.className = 'chart-detail-total';
+    total.textContent = 'Total de ese día: ' + formatChartMinutes(totalMinutes) + ' min';
+    container.appendChild(total);
+
+    container.hidden = false;
+}
+
+// Pinta el gráfico de barras: las barras, el título del rango que se está
+// viendo, el detalle del día seleccionado y el estado de los botones.
+function renderChartDays(sessions)
+{
+    const barContainer = document.getElementById('chart-barras');
+    const titleElement = document.getElementById('chart-dias-titulo');
+    const detailElement = document.getElementById('chart-detalle');
+
+    if (!barContainer) return;
+
+    const days = getDailyMinutes(sessions, chartDaysOffset);
+
+    renderBarChart(barContainer, days);
+
+    if (titleElement)
+    {
+        titleElement.textContent = getChartDaysTitle(days);
+    }
+
+    if (detailElement)
+    {
+        renderChartDetail(detailElement, sessions);
+    }
+
+    updateChartNavButtons();
+}
+
+// Cuando no hay nada que dibujar, el gráfico de barras se deja limpio
+function clearChartDays()
+{
+    const titleElement = document.getElementById('chart-dias-titulo');
+    const detailElement = document.getElementById('chart-detalle');
+
+    if (titleElement)
+    {
+        titleElement.textContent = 'Minutos por día (últimos ' + CHART_DAYS + ' días)';
+    }
+
+    if (detailElement)
+    {
+        detailElement.textContent = '';
+        detailElement.hidden = true;
+    }
+
+    updateChartNavButtons();
+}
+
+// Mover la ventana de días: hacia atrás (días positivos) o hacia delante
+// (días negativos). La ventana nunca pasa de hoy.
+function moveChartDays(days)
+{
+    let newOffset = chartDaysOffset + days;
+
+    if (newOffset < 0)
+    {
+        newOffset = 0;
+    }
+
+    if (newOffset === chartDaysOffset)
+    {
+        return;
+    }
+
+    chartDaysOffset = newOffset;
+
+    const sessions = getChartSessions();
+    const visibleDays = getDailyMinutes(sessions, chartDaysOffset);
+
+    // Si el día seleccionado ya no está en la ventana, el detalle se borra
+    let sigueVisible = false;
+
+    for (const day of visibleDays)
+    {
+        if (day.key === chartSelectedDay)
+        {
+            sigueVisible = true;
+            break;
+        }
+    }
+
+    if (!sigueVisible)
+    {
+        chartSelectedDay = '';
+    }
+
+    renderChartDays(sessions);
+}
+
+// Pulsar una barra muestra el detalle de ese día.
+// Volver a pulsar la misma barra lo oculta.
+function toggleChartDay(dayKey)
+{
+    chartSelectedDay = (chartSelectedDay === dayKey) ? '' : dayKey;
+
+    renderChartDays(getChartSessions());
+
+    // Al repintar el gráfico, el foco se pierde: se devuelve a la barra pulsada
+    focusChartDay(dayKey);
+}
+
+// Devolver el foco a la barra de un día para poder seguir con el teclado
+function focusChartDay(dayKey)
+{
+    const container = document.getElementById('chart-barras');
+
+    if (!container) return;
+
+    const group = container.querySelector('[data-chart-day="' + dayKey + '"]');
+
+    if (group)
+    {
+        group.focus();
+    }
 }
 
 // --- Gráfico circular: reparto por tema ---
@@ -2373,6 +2780,18 @@ function renderCharts()
         return;
     }
 
+    // Si ha cambiado el usuario de la app, la ventana de días vuelve a la de
+    // por defecto y el detalle seleccionado se borra: no se mezclan datos
+    // de dos usuarios.
+    const currentKey = getSessionsKey();
+
+    if (currentKey !== chartSessionsKey)
+    {
+        chartSessionsKey = currentKey;
+        chartDaysOffset = 0;
+        chartSelectedDay = '';
+    }
+
     const sessions = getChartSessions();
 
     if (sessions.length === 0)
@@ -2387,6 +2806,7 @@ function renderCharts()
         pieContainer.textContent = '';
         lineContainer.textContent = '';
         topList.textContent = '';
+        clearChartDays();
         return;
     }
 
@@ -2395,7 +2815,7 @@ function renderCharts()
         emptyBox.hidden = true;
     }
 
-    renderBarChart(barContainer, sessions);
+    renderChartDays(sessions);
     renderPieChart(pieContainer, sessions);
     renderLineChart(lineContainer, sessions);
     renderTopTopics(topList, sessions);
@@ -2403,14 +2823,13 @@ function renderCharts()
 
 // Cuando otra pestaña del navegador guarda sesiones, esta se actualiza.
 // Sin esto las dos pestañas del mismo diario muestran datos distintos.
+// Ahora cada usuario tiene su propia clave, así que solo se actualiza esta
+// pestaña si lo que ha cambiado es la clave del usuario que tiene abierto.
 window.addEventListener('storage', (e) =>
 {
-    if (e.key === STORAGE_KEY)
+    if (e.key === getSessionsKey())
     {
-        updateStreak();
-        updateBestStreak();
-        updateWeekTotal();
-        updateSessionList();
+        refreshCurrentUserViews();
     }
 });
 
@@ -2422,10 +2841,10 @@ purgeLegacyUsers();
 // Si la sesión guardada no es válida (usuario inexistente o formato raro), se borra
 validateSession();
 renderAuthStatus();
-updateStreak();
-updateBestStreak();
-updateWeekTotal();
-updateSessionList();
+
+// Un solo repintado: racha, mejor racha, total de la semana, lista y gráficos.
+refreshCurrentUserViews();
+
 renderAgents();
 restoreTimer();
 showTab('diario');

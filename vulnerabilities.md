@@ -113,8 +113,8 @@ no se ha disfrazado con seguridad falsa: está escrito como limitación aceptada
 - El usuario ahora lleva `salt` (`{ username, usernameKey, passwordHash, salt, createdAt }`).
 - Las cuentas viejas (sin `salt`) **ya no se validan**: se desactivan al arrancar (fase 3). Su hash
   era FNV-1a de 32 bits, que se rompe por colisión, así que no se pueden comprobar sin abrir ese
-  agujero. **No se pierde nada de lo estudiado**: las sesiones viven en `diario-estudio-sesiones`, no
-  en la cuenta; solo hay que crear la cuenta otra vez con el mismo nombre.
+  agujero. **No se pierde nada de lo estudiado**: las sesiones viven en la clave de sesiones del usuario
+  (ver "Fase 4" al final), no en la cuenta; solo hay que crear la cuenta otra vez con el mismo nombre.
 - Las sesiones siguen igual: `{ date, topic, minutes }`. Los minutos admiten **un decimal** (12.5).
 
 ### Lo que se añadió además
@@ -152,6 +152,33 @@ cerrados de verdad ahora, y se puede comprobar en la tabla de arriba.
 Nada nuevo. Las limitaciones de siempre (C1, C2, C7, C8 y el resto de B3) siguen sin arreglo real
 sin backend y están documentadas como aceptadas en `AGENTS.md`. No se ha disfrazado ninguna con
 seguridad falsa.
+
+---
+
+## Fase 5: las sesiones dejan de ser globales (datos por usuario)
+
+Antes **todos compartían la misma lista**: cualquiera que abriera la app veía (y pisaba) las sesiones
+de los demás, con o sin cuenta. Ahora cada usuario tiene su propia clave y la global solo sirve como
+punto de partida.
+
+| # | Qué se arregló | Estado | Cómo se comprueba |
+|---|----------------|--------|-------------------|
+| U1 | **La lista era única y compartida** por todos los usuarios | **Cerrado** | dos cuentas en el mismo navegador: cada una ve solo las suyas (68 sesiones vs 1) y la de una no aparece en la otra |
+| U2 | **Al entrar, lo registrado sin cuenta se perdía de vista** (quedaba en la global) | **Cerrado** | primera sesión de un usuario nuevo: las sesiones sin cuenta pasan a su clave (`migrateSessionsToUser()`), la global queda `[]` y **ninguna sesión se duplica en las dos claves** |
+| U3 | **Al cambiar de usuario se seguía pintando la lista, racha y gráficos del anterior** | **Cerrado** | `refreshCurrentUserViews()` al entrar y al salir: lista, racha, mejor racha, semana, gráficos y ventana de días se repintan; la ventana y el detalle se limpian al cambiar de cuenta |
+| U4 | **El gráfico de barras solo enseñaba los últimos 7 días y solo minutos**: no se podía ver qué se estudió cada día ni los días anteriores | **Cerrado** | botones `‹` y `›` mueven la ventana de 7 días sin pasar nunca de hoy, el título dice el rango (`del 17 al 23 de septiembre`) y al pulsar una barra se abre el detalle con los temas y minutos de ese día |
+
+**Notas de la fase:**
+- El **cronómetro sigue guardando su estado en la clave global** (`diario-estudio-cronometro`): es un
+  temporizador, no un dato de estudio. La sesión que registra sí acaba en la clave del usuario conectado.
+- `migrateSessionsToUser()` escribe **primero la clave del usuario y después vacía la global**; si la
+  segunda escritura fallara (cuota llena), la global quedaría con una copia vieja. Es el único punto en
+  el que podría aparecer un duplicado, y no se ha visto en ninguna prueba.
+- **Sobre "encriptar" las contraseñas**: ya están **hasheadas** (PBKDF2-HMAC-SHA256, 210.000
+  iteraciones + salt aleatorio). Encriptar sería peor: exigería guardar la clave para descifrar, y la
+  clave estaría en el mismo navegador. No existe ninguna contraseña de fábrica para "Feirt": cada cuenta
+  la crea su dueño y no es recuperable (si se olvida, se borra `diario-estudio-usuarios` en DevTools y
+  se crea otra vez; las sesiones viven en su propia clave).
 
 ---
 
@@ -457,5 +484,7 @@ Lo que **sí** se puede arreglar, en este orden:
 - [x] Cerrar los hallazgos nuevos que encontró el Inspector (Agente 3) en la fase 3 → **hecho**:
       los 9 (H1-H9) están arreglados y comprobados en el navegador; el recuento de pruebas
       corregido (H10). Ninguno queda abierto.
-- [ ] Decidir si las sesiones se separan por usuario (hoy la lista es global).
+- [x] Decidir si las sesiones se separan por usuario → **hecho en la fase 5**: clave por usuario,
+      migración única desde la global y repintado al entrar/salir. Verificado con dos cuentas
+      (sin duplicados) y con la ventana de gráficos movible por días anteriores.
 - [ ] Decidir si se documenta el bloque de Términos y Condiciones de `index.html`.

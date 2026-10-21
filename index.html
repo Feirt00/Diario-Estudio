@@ -126,8 +126,15 @@
             </p>
 
             <div class="chart-block">
-                <h3>Minutos por día (últimos 7 días)</h3>
+                <div class="chart-head">
+                    <h3 id="chart-dias-titulo">Minutos por día</h3>
+                    <div class="chart-nav">
+                        <button type="button" id="chart-dias-anterior" class="chart-nav-button" aria-label="Ver los días anteriores" title="Días anteriores">‹</button>
+                        <button type="button" id="chart-dias-siguiente" class="chart-nav-button" aria-label="Ver los días posteriores" title="Días posteriores">›</button>
+                    </div>
+                </div>
                 <div id="chart-barras" class="chart"></div>
+                <div id="chart-detalle" class="chart-detail" hidden></div>
             </div>
 
             <div class="chart-block">

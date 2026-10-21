@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!--
+        Ayuda de instalación: crea la cuenta "feirt" con sus sesiones de ejemplo.
+        No es la app: es un solo paso para doble clic. Se puede borrar después.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file:; img-src 'self' data:; object-src 'none'; base-uri 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear la cuenta feirt — Diario de Estudio</title>
+    <style>
+        body
+        {
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            line-height: 1.6;
+            max-width: 640px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #1f2937;
+            background: #f9fafb;
+        }
+
+        h1
+        {
+            font-size: 1.5rem;
+        }
+
+        .aviso
+        {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+        }
+
+        #resultado
+        {
+            background: #ecfdf5;
+            border: 1px solid #6ee7b7;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+        }
+
+        .oculto
+        {
+            display: none;
+        }
+
+        ul
+        {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Crear la cuenta <strong>feirt</strong> con sus datos de ejemplo</h1>
+
+    <p>
+        Esta página solo se usa una vez: crea la cuenta <strong>feirt</strong> en <em>este</em> navegador
+        y le rellena <strong>60 días de sesiones de estudio</strong> para poder comprobar que cada usuario
+        tiene sus propios datos.
+    </p>
+
+    <p>
+        Cuando termine, cierra esta pestaña y abre <code>index.html</code>. Entra con la cuenta
+        <strong>feirt</strong> y su contraseña <strong>12345678</strong>.
+    </p>
+
+    <div class="aviso">
+        <strong>Contraseña provisional.</strong> 12345678 es la que me pediste para poder probar.
+        Cámbiala cuando quieras: se guarda con hash (PBKDF2), nunca en claro.
+    </div>
+
+    <button type="button" id="crear">Crear la cuenta y los 60 días de sesiones</button>
+
+    <div id="resultado" class="oculto"></div>
+
+    <script src="crear-cuenta-feirt.js"></script>
+</body>
+</html>

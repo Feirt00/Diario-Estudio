@@ -26,7 +26,17 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - Diseño limpio y responsive; cualquier pantalla nueva debe verse bien en el móvil.
 
 ## Datos
-- localStorage, clave `diario-estudio-sesiones`: array de `{ date: "AAAA-MM-DD", topic, minutes }`.
+- localStorage guarda la lista de sesiones: array de `{ date: "AAAA-MM-DD", topic, minutes }`.
+- **Cada usuario tiene sus propias sesiones**: con sesión iniciada la clave es
+  `diario-estudio-sesiones-<usernameKey>` (por ejemplo `diario-estudio-sesiones-ana`); sin cuenta se usa
+  la clave global `diario-estudio-sesiones`. El nombre de la clave la calcula `getSessionsKey()`.
+- **Migración única**: la primera vez que un usuario entra, si su clave todavía no existe, las sesiones
+  que hubiera en la global pasan a su clave y la global queda vacía (`migrateSessionsToUser()`). Así
+  nadie pierde lo que tenía registrado y ninguna sesión queda duplicada en las dos claves.
+- **Todo lo demás se recalcula desde `loadSessions()`** (racha, mejor racha, total de la semana, lista y
+  gráficos), que ya devuelve las sesiones del usuario actual: no hace falta tocar nada más.
+- `refreshCurrentUserViews()` repinta todo eso de golpe y la llama Zeirt al arrancar, al iniciar sesión,
+  al cerrar sesión y cuando otra pestaña del navegador guarda sesiones.
 - Si cambias la forma de los datos, mantén compatibilidad con lo ya guardado o el usuario perderá sus sesiones.
 - El contenido del usuario **nunca** se pinta con `innerHTML`: usa `createElement` + `textContent`.
 - **Todo lo que lees de `localStorage` se valida antes de usarlo**: puede venir corrupto o manipulado a
@@ -55,6 +65,13 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
   puede depender de la red. Cada SVG con `viewBox` + `width: 100%` para que se vea bien en el móvil.
 - Los colores de los gráficos van con **clases CSS** (y su variante `body.dark`), no en línea, para que el
   tema oscuro los pueda cambiar.
+- **Gráfico de barras navegable**: enseña una ventana de **7 días** movible con los botones `‹` y `›`
+  (`moveChartDays()`), que nunca pasa de hoy. El título (`#chart-dias-titulo`) dice el rango visible y
+  cada barra es un `<g class="chart-day" role="button" tabindex="0">` con su `<title>` y `aria-label`.
+- **Detalle por día**: al pulsar (o darle a `Enter` en) una barra se abre `#chart-detalle` con los temas
+  y minutos de ese día (`renderChartDetail()`); un segundo clic lo cierra. Las variables de la ventana
+  son `chartDaysOffset`, `chartSelectedDay` y `chartSessionsKey`; al cambiar de usuario hay que
+  llamar a `clearChartDays()`, que es lo que hace `refreshCurrentUserViews()`.
 
 ## Autenticación (solo local, sin backend)
 - No hay servidor ni base de datos: usuarios y sesión viven en `localStorage`.
@@ -63,8 +80,8 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - `hashPassword()`, `registerUser()` y `loginUser()` son **asíncronas**: quien las llama usa `await`.
 - Las cuentas anteriores a PBKDF2 (sin `salt`) están **desactivadas**: su hash era FNV-1a de 32 bits,
   que se rompe por colisión, así que no se pueden validar sin abrir ese agujero. `purgeLegacyUsers()`
-  las borra al arrancar. **No se pierde nada de lo estudiado**: las sesiones viven en
-  `diario-estudio-sesiones`, no en la cuenta; solo hay que crear la cuenta otra vez.
+  las borra al arrancar. **No se pierde nada de lo estudiado**: las sesiones viven en la clave de
+  sesiones del usuario, no dentro de la cuenta; solo hay que crear la cuenta otra vez.
 - Contraseñas: mínimo 8 caracteres, máximo 128 y lista de contraseñas comunes rechazadas.
 - `usernameKey` es el nombre en minúsculas y sin espacios: dos usuarios que solo se diferencian en mayúsculas o espacios son el mismo.
 - Login fallido devuelve siempre el mismo mensaje genérico para no revelar qué usuarios existen.
@@ -73,8 +90,9 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
   comportamiento cambian según exista el nombre, se puede enumerar la lista de usuarios.
 - **Ni el tiempo puede delatarlo**: cuando el usuario no existe se calcula un hash "de mentira" con
   el mismo coste, para que el login tarde lo mismo en los dos casos (canal de tiempo).
-- La app escucha el evento `storage`: si otra pestaña del navegador guarda sesiones, esta actualiza
-  sola la lista y los totales.
+- La app escucha el evento `storage`: si otra pestaña del navegador guarda sesiones de **este mismo
+  usuario** (su clave), esta actualiza sola la lista, los totales y los gráficos. Si cambia la clave de
+  sesiones (al entrar o salir de una cuenta), la vista se repinta con `refreshCurrentUserViews()`.
 - Rate limit local: 5 intentos fallidos → 30 s de bloqueo en el que **ni un login correcto entra**. El bloqueo vive en `loginUser()`, no en el evento del formulario; se resetea al iniciar sesión.
 - La sesión se valida al arrancar (`validateSession()`): si el usuario no existe o el formato es raro, se borra y se sigue sin sesión.
 - La app **no** está protegida: se puede usar sin iniciar sesión. El login solo identifica al usuario.

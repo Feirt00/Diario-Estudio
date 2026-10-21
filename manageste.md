@@ -13,10 +13,10 @@ Cómo funciona el equipo de agentes de este proyecto y qué está haciendo cada 
 | Agente | Rol | Zona de código reservada |
 |--------|-----|---------------------------|
 | **Zeirt** (padre) | Decide qué se hace, delega, **verifica** el trabajo de los otros y completa lo que falte. Es el único que commitea. | Toda la app (revisión final) |
-| **Agente 1 — Guardian de los Datos** | Robustez de datos: lectura/escritura de `localStorage`, validación de lo guardado, totales | `loadSessions`, `saveSessions`, `formatDate`, `calculateWeekMinutes`, `updateSessionList`, `createSessionItem`, submit del formulario de estudio, `#form-message` |
-| **Agente 2 — Criptógrafo del Acceso** | Acceso de usuarios: hash, contraseñas, sesión, registro y login | `hashPassword`, `usernameKey`, `*Users`, `*Session`, `*Attempts`, `registerUser`, `loginUser`, `logoutUser`, `renderAuthStatus`, modal de acceso, bloque `// Inicializar` |
+| **Agente 1 — Guardian de los Datos** | Robustez de datos: lectura/escritura de `localStorage`, validación de lo guardado, totales y **sesiones por usuario** | `loadSessions`, `saveSessions`, `getSessionsKey`, `migrateSessionsToUser`, `parseSessions`, `refreshCurrentUserViews`, `formatDate`, `calculateWeekMinutes`, `updateSessionList`, `createSessionItem`, submit del formulario de estudio, `#form-message` |
+| **Agente 2 — Criptógrafo del Acceso** | Acceso de usuarios: hash, contraseñas, sesión, registro y login | `hashPassword`, `usernameKey`, `*Users`, `*Session`, `*Attempts`, `registerUser`, `loginUser`, `logoutUser`, `renderAuthStatus`, modal de acceso. Zeirt engancha `refreshCurrentUserViews()` al entrar y salir |
 | **Agente 3 — Inspector (QA)** | Verifica los arreglos contra `vulnerabilities.md` y busca fallos nuevos | **Ninguna**: solo lee, prueba y escribe el informe |
-| **Agente 4 — Analista de Datos** | Gráficos de estudio: barras, circular y línea, dibujados a mano en SVG | `renderCharts()` + estilos `.chart*` / `.top-list` |
+| **Agente 4 — Analista de Datos** | Gráficos de estudio: barras, circular y línea, dibujados a mano en SVG, con **ventana de días movible y detalle por día** | `renderCharts`, `renderBarChart`, `getDailyMinutes`, `renderChartDays`, `renderChartDetail`, `moveChartDays`, `toggleChartDay` + estilos `.chart*` / `.top-list` |
 
 > El equipo son **5 en total** (Zeirt + 4), el máximo pactado. Cada agente tiene una zona reservada. Si un
 > agente necesita tocar la zona de otro, **no lo hace**: lo anota en su informe y lo decide Zeirt. Así dos
@@ -101,6 +101,34 @@ _(estado en vivo; se actualiza al cerrar cada fase)_
 |--------|-------|--------|
 | **Zeirt (padre)** | Arreglar los 9 hallazgos (H1-H9) y corregir la documentación que mentía | **Terminado**: los 9 comprobados uno por uno en el navegador, 0 excepciones de consola |
 
+### Fase 5 — Datos por usuario y gráficos navegables — **CERRADA**
+
+| Agente | Tarea | Estado |
+|--------|-------|--------|
+| **Agente 1 — Guardian de los Datos** | Que cada usuario tenga sus propias sesiones (antes la lista era global y todos compartían) | **Terminado**: `getSessionsKey()` da una clave por usuario, `migrateSessionsToUser()` mueve las sesiones sin cuenta a la cuenta la primera vez y `refreshCurrentUserViews()` repinta al cambiar de usuario. Verificado por Zeirt |
+| **Zeirt (padre)** | Enganchar el repintado al login y al logout (zona de acceso, reservada al Agente 2) | **Terminado**: `refreshCurrentUserViews()` en el submit del formulario de acceso, en `logoutUser()` y en el arranque |
+| **Agente 4 — Analista de Datos** | Los gráficos solo enseñaban los últimos 7 días y solo minutos, sin ver **qué** se estudió | **Terminado**: ventana de 7 días movible con `‹` y `›` (nunca pasa de hoy), detalle por día al pulsar una barra, barras accesibles con teclado. Verificado por Zeirt |
+| **Zeirt (padre)** | Verificar los dos cambios, integrarlos y dejar la documentación al día | **Terminado** (ver abajo) |
+
+**Lo que hizo Zeirt como padre en esta fase:**
+- Delegó los dos trabajos con sus zonas reservadas y verificó los diffs: **ninguno tocó la zona del otro**
+  ni la de nadie más (`app.js` y `styles.css` con hunks dentro de su zona, `index.html` solo por Zeirt).
+- Comprobó los 9 casos en navegador real con sus propios scripts CDP: 0 excepciones de consola.
+- **Encontró un aviso del Agente 4 y lo cerró él**: `loginUser()` llamado directo no repintaba (el enganche
+  vive en el formulario). Ya no es así: al entrar y al salir se repinta todo.
+- Revisó el informe del Agente 4 y encontró dos erratas que **no** eran errores de código: nombraba
+  `CHART_WEEKS (4)` y funciones (`renderDonutChart`, `renderRankingList`) que no existen. El código está
+  bien: `CHART_WEEKS` sigue en 8 y no se renombró ni se tocó ningún otro gráfico.
+- **Investigó un posible duplicado de datos**: una sesión aparecía a la vez en la clave global y en la de un
+  usuario. Lo traçó paso a paso y el duplicado **no era del código**: venía de una prueba suya mal hecha (al
+  pulsar "Iniciar sesión" el modal abre en modo *login* y su script no cambiaba a *registro*, así que la
+  cuenta nunca se creaba y el flujo de migración no corría). Con el flujo real, las 7 etapas salen limpias.
+
+**Cómo comprobarlo a mano (lo que pidió Feirt):**
+- `crear-cuenta-feirt.html` + `crear-cuenta-feirt.js`: ayuda de una sola vez, **no es la app**. Doble clic,
+  crea la cuenta **feirt** (contraseña provisional `12345678`, hasheada igual que la app) con **60 días de
+  sesiones** repartidas en su clave. Se puede borrar el fichero después.
+
 **Lo que hizo Zeirt como padre en esta fase:**
 - **H1 (`localStorage` sin protección)**: helpers `storageGet()`/`storageSet()`/`storageRemove()` que nunca
   lanzan; los 13 accesos directos del archivo pasan por ellos. Con el almacenamiento bloqueado la app
@@ -163,3 +191,4 @@ arreglo real** y se aceptan como limitación (documentadas en `AGENTS.md`):
 | 2026-10-21 | Fase 2 (verificación) | Agente 3 (Inspector): 27 pruebas repetidas + 25 nuevas → 9 hallazgos nuevos (H1-H9) |
 | 2026-10-21 | Fase 3 (funcionalidad) | Zeirt (pestañas + cronómetro) y Agente 4 (gráficos en SVG) |
 | 2026-10-21 | Fase 4 (arreglos de los hallazgos) | Zeirt: los 9 hallazgos cerrados y comprobados; commit `v1.6` |
+| 2026-10-21 | Fase 5 (datos por usuario + gráficos navegables) | Agente 1 (sesiones por cuenta) y Agente 4 (ventana de días + detalle), Zeirt verificando e integrando |
