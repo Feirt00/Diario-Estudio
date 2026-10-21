@@ -35,6 +35,22 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - Los errores al leer o guardar se avisan **en la interfaz**, nunca con `alert()` ni solo por consola:
   `saveSessions()` devuelve `{ ok, message }` y el mensaje se pinta en `#form-message`.
 
+## Pestañas, cronómetro y gráficos
+- La app tiene **tres pestañas**: Diario, Cronómetro y Gráficos. Los paneles son `<section class="panel">`
+  y se muestran con el atributo `hidden`. Ojo: la regla CSS `.panel { display: block }` gana al
+  `[hidden]` del navegador, así que hace falta `.panel[hidden] { display: none }`.
+- Todo cambio de pestaña pasa por `showTab(tabName)`. No toggles `hidden` a mano desde otros sitios.
+- **Cronómetro**: la cuenta atrás se calcula con la **hora real** (`Date.now()`), nunca con un contador que
+  se incrementa: `setInterval` se desvía y en segundo plano se para. Estado en
+  `diario-estudio-cronometro` (prefijo `diario-estudio-`).
+- El cronómetro **no duplica** la lógica del formulario: registra la sesión con `loadSessions()` +
+  `saveSessions()`.
+- El aviso al terminar es **sonido con la Web Audio API**, sin archivos de sonido ni descargas.
+- **Gráficos**: se dibujan **a mano con SVG** (`createElementNS`). Nada de Chart.js, D3 ni CDN: la app no
+  puede depender de la red. Cada SVG con `viewBox` + `width: 100%` para que se vea bien en el móvil.
+- Los colores de los gráficos van con **clases CSS** (y su variante `body.dark`), no en línea, para que el
+  tema oscuro los pueda cambiar.
+
 ## Autenticación (solo local, sin backend)
 - No hay servidor ni base de datos: usuarios y sesión viven en `localStorage`.
 - Claves: `diario-estudio-usuarios` (array de `{ username, usernameKey, passwordHash, salt, createdAt }`), `diario-estudio-sesion` (sesión activa) y `diario-estudio-login-intentos` (rate limit).

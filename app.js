@@ -10,6 +10,16 @@ const weekMinutesDisplay = document.getElementById('week-minutes');
 const sessionList = document.getElementById('session-list');
 const agentList = document.getElementById('agent-list');
 const themeToggle = document.getElementById('theme-toggle');
+const timerDisplay = document.getElementById('timer-display');
+const timerTotal = document.getElementById('timer-total');
+const timerMinutes = document.getElementById('timer-minutes');
+const timerTopic = document.getElementById('timer-topic');
+const timerStart = document.getElementById('timer-start');
+const timerPause = document.getElementById('timer-pause');
+const timerReset = document.getElementById('timer-reset');
+const timerMessage = document.getElementById('timer-message');
+const timerDone = document.getElementById('timer-done');
+const timerSave = document.getElementById('timer-save');
 const authStatus = document.getElementById('auth-status');
 const authModal = document.getElementById('auth-modal');
 const authClose = document.getElementById('auth-close');
@@ -415,7 +425,8 @@ const AGENTS = [
     { name: 'Zeirt', role: 'Agente principal', task: 'Verifica, integra y documenta', status: 'trabajando' },
     { name: 'Guardian de los Datos', role: 'Agente 1', task: 'Robustez de datos y validaciones', status: 'terminado' },
     { name: 'Criptógrafo del Acceso', role: 'Agente 2', task: 'Hash, contraseñas y sesión', status: 'terminado' },
-    { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'pendiente' }
+    { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'trabajando' },
+    { name: 'Analista de Datos', role: 'Agente 4', task: 'Gráficos de estudio en SVG', status: 'terminado' }
 ];
 
 // Pintar el apartado de agentes
@@ -1173,6 +1184,1072 @@ setInterval(() =>
     }
 }, 1000);
 
+// ---------- Pestañas ----------
+
+// Mostrar una pestaña y ocultar las demás
+function showTab(tabName)
+{
+    const buttons = document.querySelectorAll('.tab-button');
+
+    for (const button of buttons)
+    {
+        const isActive = button.dataset.tab === tabName;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    }
+
+    const panels = document.querySelectorAll('.panel');
+
+    for (const panel of panels)
+    {
+        panel.hidden = panel.id !== 'panel-' + tabName;
+    }
+
+    // Los gráficos se redibujan al abrir su pestaña (la función la aporta el agente de gráficos)
+    if (tabName === 'graficos' && typeof renderCharts === 'function')
+    {
+        renderCharts();
+    }
+}
+
+for (const tabButton of document.querySelectorAll('.tab-button'))
+{
+    tabButton.addEventListener('click', () =>
+    {
+        showTab(tabButton.dataset.tab);
+    });
+}
+
+// ---------- Cronómetro ----------
+
+// Clave de localStorage donde se guarda el estado del cronómetro
+const TIMER_KEY = 'diario-estudio-cronometro';
+
+let timerRemaining = 0;     // segundos que quedan
+let timerTotalSeconds = 0;  // segundos de la sesión completa
+let timerEndAt = 0;         // momento en que acaba (0 si está en pausa)
+let timerTicker = null;     // intervalo que refresca la cuenta atrás
+
+// Formatear segundos como "mm:ss" (o "h:mm:ss" si hace falta)
+function formatTimer(seconds)
+{
+    const safe = Math.max(0, Math.round(seconds));
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const rest = safe % 60;
+
+    if (hours > 0)
+    {
+        return hours + ':' + String(minutes).padStart(2, '0') + ':' + String(rest).padStart(2, '0');
+    }
+
+    return String(minutes).padStart(2, '0') + ':' + String(rest).padStart(2, '0');
+}
+
+// Aviso del cronómetro (si el texto está vacío, el aviso se oculta)
+function showTimerMessage(text, type)
+{
+    if (!text)
+    {
+        timerMessage.hidden = true;
+        timerMessage.textContent = '';
+        return;
+    }
+
+    timerMessage.hidden = false;
+    timerMessage.textContent = text;
+    timerMessage.className = 'form-message ' + (type || '');
+}
+
+// Guardar el estado del cronómetro para que sobreviva a cerrar la página
+function saveTimerState()
+{
+    const state = {
+        remaining: timerRemaining,
+        total: timerTotalSeconds,
+        endAt: timerEndAt,
+        topic: timerTopic.value,
+        minutes: timerMinutes.value
+    };
+
+    try
+    {
+        localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+    }
+    catch (e)
+    {
+        // Si el navegador no deja guardar, el cronómetro sigue funcionando en memoria
+    }
+}
+
+// Leer el estado guardado del cronómetro
+function loadTimerState()
+{
+    try
+    {
+        const data = localStorage.getItem(TIMER_KEY);
+        if (!data) return null;
+        return JSON.parse(data);
+    }
+    catch (e)
+    {
+        return null;
+    }
+}
+
+// Pintar el tiempo que queda
+function updateTimerDisplay()
+{
+    timerDisplay.textContent = formatTimer(timerRemaining);
+
+    if (timerTotalSeconds > 0)
+    {
+        timerTotal.hidden = false;
+        timerTotal.textContent = 'Sesión de ' + formatTimer(timerTotalSeconds)
+            + ' · quedan ' + formatTimer(timerRemaining);
+    }
+    else
+    {
+        timerTotal.hidden = true;
+    }
+}
+
+// Arrancar el intervalo que refresca la cuenta atrás
+function startTicker()
+{
+    stopTicker();
+    timerTicker = setInterval(tickTimer, 250);
+}
+
+// Parar el intervalo de la cuenta atrás
+function stopTicker()
+{
+    if (timerTicker !== null)
+    {
+        clearInterval(timerTicker);
+        timerTicker = null;
+    }
+}
+
+// Cada tick: se usa la hora real y no un contador, para que el reloj no se desvíe
+function tickTimer()
+{
+    if (!timerEndAt) return;
+
+    timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
+    updateTimerDisplay();
+
+    if (timerRemaining <= 0)
+    {
+        finishTimer();
+    }
+}
+
+// Empezar (o continuar) el cronómetro
+function startTimer()
+{
+    if (timerEndAt > 0) return;
+
+    if (timerRemaining <= 0)
+    {
+        const minutes = Number(timerMinutes.value);
+
+        if (!isFinite(minutes) || minutes <= 0)
+        {
+            showTimerMessage('Escribe cuántos minutos quieres estudiar (mínimo 1).', 'error');
+            return;
+        }
+
+        timerTotalSeconds = Math.round(minutes * 60);
+        timerRemaining = timerTotalSeconds;
+    }
+
+    timerEndAt = Date.now() + timerRemaining * 1000;
+    timerDone.hidden = true;
+    timerStart.disabled = true;
+    timerPause.disabled = false;
+    showTimerMessage('', '');
+    saveTimerState();
+    updateTimerDisplay();
+    startTicker();
+}
+
+// Pausar la cuenta atrás
+function pauseTimer()
+{
+    if (!timerEndAt) return;
+
+    timerRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
+    timerEndAt = 0;
+    stopTicker();
+    timerPause.disabled = true;
+    timerStart.disabled = false;
+    saveTimerState();
+    updateTimerDisplay();
+}
+
+// Volver a cero
+function resetTimer()
+{
+    stopTicker();
+    timerEndAt = 0;
+    timerRemaining = 0;
+    timerTotalSeconds = 0;
+    timerDone.hidden = true;
+    timerStart.disabled = false;
+    timerPause.disabled = true;
+    showTimerMessage('', '');
+    updateTimerDisplay();
+    saveTimerState();
+}
+
+// El tiempo se ha acabado
+function finishTimer()
+{
+    stopTicker();
+    timerEndAt = 0;
+    timerRemaining = 0;
+    timerPause.disabled = true;
+    timerStart.disabled = false;
+    showTimerDone();
+    playTimerSound();
+    updateTimerDisplay();
+    saveTimerState();
+}
+
+// Mostrar el aviso de "se acabó el tiempo"
+function showTimerDone()
+{
+    timerDone.hidden = false;
+    showTimerMessage('¡Tiempo terminado! Puedes registrar la sesión en el diario.', 'success');
+}
+
+// Registrar en el diario la sesión hecha con el cronómetro
+function saveTimerSession()
+{
+    const elapsed = Math.max(0, timerTotalSeconds - timerRemaining);
+    const minutes = Math.max(1, Math.round(elapsed / 60));
+    const topic = timerTopic.value.trim() || 'Sesión de cronómetro';
+
+    const sessions = loadSessions();
+    sessions.push({ date: getTodayLocal(), topic: topic, minutes: minutes });
+
+    const result = saveSessions(sessions);
+
+    if (!result.ok)
+    {
+        showTimerMessage(result.message, 'error');
+        return;
+    }
+
+    resetTimer();
+    updateStreak();
+    updateBestStreak();
+    updateWeekTotal();
+    updateSessionList();
+    showTab('diario');
+    showFormMessage('Sesión del cronómetro registrada: ' + minutes + ' min.', 'success');
+}
+
+// Sonido al terminar (Web Audio API, sin archivos externos)
+function playTimerSound()
+{
+    try
+    {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+
+        const context = new AudioContextClass();
+
+        for (let i = 0; i < 3; i++)
+        {
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            const start = context.currentTime + i * 0.35;
+
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 880;
+
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(0.25, start + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+
+            oscillator.start(start);
+            oscillator.stop(start + 0.32);
+        }
+
+        setTimeout(() => context.close(), 1500);
+    }
+    catch (e)
+    {
+        // Si el navegador no deja reproducir sonido, el aviso visual sigue estando
+    }
+}
+
+// Recuperar el cronómetro que quedó a medias al cerrar la página
+function restoreTimer()
+{
+    const state = loadTimerState();
+    if (!state) return;
+
+    timerTotalSeconds = Number(state.total) || 0;
+    timerRemaining = Number(state.remaining) || 0;
+
+    if (typeof state.topic === 'string') timerTopic.value = state.topic;
+    if (state.minutes) timerMinutes.value = state.minutes;
+
+    const endAt = Number(state.endAt) || 0;
+
+    if (endAt > 0)
+    {
+        if (endAt > Date.now())
+        {
+            // seguía corriendo con la página cerrada: sigue contando donde lo dejó
+            timerEndAt = endAt;
+            timerRemaining = Math.ceil((endAt - Date.now()) / 1000);
+            timerStart.disabled = true;
+            timerPause.disabled = false;
+            startTicker();
+        }
+        else
+        {
+            // se acabó mientras la página estaba cerrada
+            timerRemaining = 0;
+            timerStart.disabled = false;
+            timerPause.disabled = true;
+            showTimerDone();
+        }
+    }
+    else if (timerRemaining > 0)
+    {
+        timerStart.disabled = false;
+        timerPause.disabled = true;
+    }
+
+    updateTimerDisplay();
+}
+
+timerStart.addEventListener('click', startTimer);
+timerPause.addEventListener('click', pauseTimer);
+timerReset.addEventListener('click', resetTimer);
+timerSave.addEventListener('click', saveTimerSession);
+
+// ============================================================
+// Gráficos (SVG dibujado a mano, sin librerías)
+// ============================================================
+
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const CHART_DAYS = 7;
+const CHART_WEEKS = 8;
+const CHART_MAX_TOPICS = 5;
+const CHART_COLOR_COUNT = 6;
+
+// --- Utilidades para dibujar ---
+
+// Crear un elemento del SVG con sus atributos
+function createSvgElement(tag, attributes)
+{
+    const element = document.createElementNS(SVG_NAMESPACE, tag);
+
+    for (const name in attributes)
+    {
+        if (!Object.prototype.hasOwnProperty.call(attributes, name))
+        {
+            continue;
+        }
+
+        const value = attributes[name];
+        if (value === null || value === undefined)
+        {
+            continue;
+        }
+
+        element.setAttribute(name, String(value));
+    }
+
+    return element;
+}
+
+// Crear un texto dentro del SVG
+function createSvgText(content, attributes)
+{
+    const text = createSvgElement('text', attributes);
+    text.textContent = content;
+    return text;
+}
+
+// Añadir el <title> que el navegador usa como tooltip al pasar el ratón
+function addSvgTooltip(element, text)
+{
+    const title = createSvgElement('title', {});
+    title.textContent = text;
+    element.appendChild(title);
+    return element;
+}
+
+// Minutos con decimales solo si hacen falta (coma decimal en español)
+function formatChartMinutes(minutes)
+{
+    const value = Number(minutes);
+    if (!isFinite(value)) return '0';
+
+    if (Number.isInteger(value)) return String(value);
+
+    return value.toFixed(1).replace('.', ',');
+}
+
+// Nombre corto del día de la semana ("mié")
+function formatChartWeekday(date)
+{
+    return date.toLocaleDateString('es-ES', { weekday: 'short' });
+}
+
+// Fecha corta ("21/10")
+function formatChartDayNumber(date)
+{
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+}
+
+// Texto de una semana: "del 21/10 al 27/10"
+function formatChartWeekRange(week)
+{
+    return 'del ' + formatChartDayNumber(week.monday) + ' al ' + formatChartDayNumber(week.sunday);
+}
+
+// Nombre de un tema: si viene vacío se pone algo legible
+function getTopicLabel(topic)
+{
+    const name = typeof topic === 'string' ? topic.trim() : '';
+    return name !== '' ? topic : '(sin tema)';
+}
+
+// --- Datos de los gráficos ---
+
+// Sesiones que se pueden dibujar: minutos válidos y fecha no futura,
+// igual que los totales de la app (las fechas futuras no suman).
+function getChartSessions()
+{
+    const sessions = loadSessions();
+    const today = getTodayLocal();
+    const usable = [];
+
+    for (const session of sessions)
+    {
+        if (!session || typeof session.date !== 'string')
+        {
+            continue;
+        }
+
+        if (session.date > today)
+        {
+            continue;
+        }
+
+        const minutes = Number(session.minutes);
+        if (!isFinite(minutes) || minutes < 0)
+        {
+            continue;
+        }
+
+        usable.push({ date: session.date, topic: session.topic, minutes: minutes });
+    }
+
+    return usable;
+}
+
+// Minutos y sesiones de cada tema, de más a menos minutos
+function groupMinutesByTopic(sessions)
+{
+    const totals = new Map();
+
+    for (const session of sessions)
+    {
+        const current = totals.get(session.topic);
+
+        if (current)
+        {
+            current.minutes += session.minutes;
+            current.sessions += 1;
+        }
+        else
+        {
+            totals.set(session.topic, { topic: session.topic, minutes: session.minutes, sessions: 1 });
+        }
+    }
+
+    const groups = Array.from(totals.values());
+    groups.sort((a, b) => b.minutes - a.minutes || a.topic.localeCompare(b.topic, 'es'));
+    return groups;
+}
+
+// El lunes de la semana a la que pertenece una fecha
+function getMondayOf(date)
+{
+    const monday = new Date(date.getTime());
+    const daysSinceMonday = (monday.getDay() + 6) % 7;
+    monday.setDate(monday.getDate() - daysSinceMonday);
+    return monday;
+}
+
+// Minutos de cada uno de los últimos 7 días (hoy incluido).
+// Los días sin sesiones se quedan a cero: así se ve la ausencia.
+function getDailyMinutes(sessions)
+{
+    const days = [];
+    const today = parseLocalDate(getTodayLocal());
+
+    for (let offset = CHART_DAYS - 1; offset >= 0; offset--)
+    {
+        const date = new Date(today.getTime());
+        date.setDate(date.getDate() - offset);
+        days.push({ date: date, key: toLocalDateString(date), minutes: 0 });
+    }
+
+    for (const session of sessions)
+    {
+        for (const day of days)
+        {
+            if (day.key === session.date)
+            {
+                day.minutes += session.minutes;
+                break;
+            }
+        }
+    }
+
+    return days;
+}
+
+// Minutos de cada una de las últimas 8 semanas (de lunes a domingo).
+// Las semanas sin datos se quedan a cero.
+function getWeeklyMinutes(sessions)
+{
+    const weeks = [];
+    const currentMonday = getMondayOf(parseLocalDate(getTodayLocal()));
+
+    for (let offset = CHART_WEEKS - 1; offset >= 0; offset--)
+    {
+        const monday = new Date(currentMonday.getTime());
+        monday.setDate(monday.getDate() - offset * 7);
+
+        const sunday = new Date(monday.getTime());
+        sunday.setDate(sunday.getDate() + 6);
+
+        weeks.push({
+            monday: monday,
+            sunday: sunday,
+            key: toLocalDateString(monday),
+            minutes: 0
+        });
+    }
+
+    for (const session of sessions)
+    {
+        const key = toLocalDateString(getMondayOf(parseLocalDate(session.date)));
+
+        for (const week of weeks)
+        {
+            if (week.key === key)
+            {
+                week.minutes += session.minutes;
+                break;
+            }
+        }
+    }
+
+    return weeks;
+}
+
+// Reparto por tema: como mucho 5 temas y el resto agrupado en "Otros"
+function getTopicSlices(sessions)
+{
+    const groups = groupMinutesByTopic(sessions);
+    const withMinutes = groups.filter(group => group.minutes > 0);
+
+    const slices = withMinutes.slice(0, CHART_MAX_TOPICS);
+    const rest = withMinutes.slice(CHART_MAX_TOPICS);
+
+    if (rest.length > 0)
+    {
+        let minutes = 0;
+        let count = 0;
+
+        for (const group of rest)
+        {
+            minutes += group.minutes;
+            count += group.sessions;
+        }
+
+        slices.push({ topic: 'Otros', minutes: minutes, sessions: count });
+    }
+
+    return slices;
+}
+
+// --- Gráfico de barras: minutos por día ---
+
+function renderBarChart(container, sessions)
+{
+    container.textContent = '';
+
+    const days = getDailyMinutes(sessions);
+    const width = 320;
+    const height = 210;
+    const paddingLeft = 8;
+    const paddingRight = 8;
+    const topSpace = 24;
+    const bottomSpace = 38;
+    const plotHeight = height - topSpace - bottomSpace;
+    const baseline = topSpace + plotHeight;
+    const slot = (width - paddingLeft - paddingRight) / days.length;
+    const barWidth = slot * 0.58;
+
+    let maxMinutes = 0;
+    for (const day of days)
+    {
+        if (day.minutes > maxMinutes)
+        {
+            maxMinutes = day.minutes;
+        }
+    }
+
+    const svg = createSvgElement('svg', {
+        'viewBox': '0 0 ' + width + ' ' + height,
+        'role': 'img'
+    });
+    addSvgTooltip(svg, 'Minutos estudiados por día en los últimos ' + CHART_DAYS + ' días');
+
+    // Línea de la base
+    svg.appendChild(createSvgElement('line', {
+        'x1': paddingLeft,
+        'y1': baseline,
+        'x2': width - paddingRight,
+        'y2': baseline,
+        'class': 'chart-axis'
+    }));
+
+    for (let i = 0; i < days.length; i++)
+    {
+        const day = days[i];
+        const centerX = paddingLeft + slot * i + slot / 2;
+        const barHeight = maxMinutes > 0 ? (day.minutes / maxMinutes) * plotHeight : 0;
+        const barX = centerX - barWidth / 2;
+        const barY = baseline - barHeight;
+
+        const bar = createSvgElement('rect', {
+            'x': barX,
+            'y': barY,
+            'width': barWidth,
+            'height': barHeight,
+            'rx': 3,
+            'class': 'chart-bar'
+        });
+        addSvgTooltip(bar, formatChartWeekday(day.date) + ' ' + formatChartDayNumber(day.date)
+            + ': ' + formatChartMinutes(day.minutes) + ' min');
+        svg.appendChild(bar);
+
+        // Marca del día en la base: también aparece en los días sin sesiones
+        svg.appendChild(createSvgElement('rect', {
+            'x': barX,
+            'y': baseline,
+            'width': barWidth,
+            'height': 2,
+            'class': 'chart-tick'
+        }));
+
+        // Minutos encima de la barra
+        svg.appendChild(createSvgText(formatChartMinutes(day.minutes), {
+            'x': centerX,
+            'y': barY - 6,
+            'class': 'chart-value',
+            'text-anchor': 'middle'
+        }));
+
+        // Etiqueta del día: nombre del día y fecha local
+        svg.appendChild(createSvgText(formatChartWeekday(day.date), {
+            'x': centerX,
+            'y': baseline + 16,
+            'class': 'chart-label',
+            'text-anchor': 'middle'
+        }));
+        svg.appendChild(createSvgText(formatChartDayNumber(day.date), {
+            'x': centerX,
+            'y': baseline + 29,
+            'class': 'chart-label',
+            'text-anchor': 'middle'
+        }));
+    }
+
+    container.appendChild(svg);
+}
+
+// --- Gráfico circular: reparto por tema ---
+
+// Un punto del círculo a partir de un ángulo (grados, sentido horario desde las 12)
+function polarToPoint(centerX, centerY, radius, angle)
+{
+    const radians = (angle * Math.PI) / 180;
+
+    return {
+        x: centerX + radius * Math.sin(radians),
+        y: centerY - radius * Math.cos(radians)
+    };
+}
+
+// Camino SVG de una porción de pizza.
+// El arco va del final al principio con la bandera "0" (antihorario) para que
+// la porción se dibuje en el sentido correcto.
+function describePieSlice(centerX, centerY, radius, startAngle, endAngle)
+{
+    const start = polarToPoint(centerX, centerY, radius, endAngle);
+    const end = polarToPoint(centerX, centerY, radius, startAngle);
+    const largeArc = (endAngle - startAngle) > 180 ? '1' : '0';
+
+    return 'M ' + centerX + ' ' + centerY
+        + ' L ' + start.x.toFixed(2) + ' ' + start.y.toFixed(2)
+        + ' A ' + radius + ' ' + radius + ' 0 ' + largeArc + ' 0 '
+        + end.x.toFixed(2) + ' ' + end.y.toFixed(2)
+        + ' Z';
+}
+
+function renderPieChart(container, sessions)
+{
+    container.textContent = '';
+
+    const slices = getTopicSlices(sessions);
+
+    let total = 0;
+    for (const slice of slices)
+    {
+        total += slice.minutes;
+    }
+
+    if (total <= 0)
+    {
+        const message = document.createElement('p');
+        message.className = 'empty-message';
+        message.textContent = 'Todavía no hay minutos que repartir por temas.';
+        container.appendChild(message);
+        return;
+    }
+
+    const width = 320;
+    const height = 220;
+    const centerX = width / 2;
+    const centerY = 110;
+    const radius = 90;
+
+    const svg = createSvgElement('svg', {
+        'viewBox': '0 0 ' + width + ' ' + height,
+        'role': 'img'
+    });
+    addSvgTooltip(svg, 'Reparto de los minutos estudiados por tema');
+
+    let angle = 0;
+
+    for (let i = 0; i < slices.length; i++)
+    {
+        const slice = slices[i];
+        const share = (slice.minutes / total) * 360;
+        const startAngle = angle;
+        const endAngle = angle + share;
+        angle = endAngle;
+
+        const colorClass = 'chart-color-' + Math.min(i + 1, CHART_COLOR_COUNT);
+        let shape;
+
+        if (share >= 359.999)
+        {
+            // Un solo tema ocupa toda la circunferencia: el arco sedegeneraría,
+            // así que se dibuja un círculo entero.
+            shape = createSvgElement('circle', {
+                'cx': centerX,
+                'cy': centerY,
+                'r': radius,
+                'class': 'chart-slice ' + colorClass
+            });
+        }
+        else
+        {
+            shape = createSvgElement('path', {
+                'd': describePieSlice(centerX, centerY, radius, startAngle, endAngle),
+                'class': 'chart-slice ' + colorClass
+            });
+        }
+
+        addSvgTooltip(shape, getTopicLabel(slice.topic) + ': ' + formatChartMinutes(slice.minutes) + ' min');
+        svg.appendChild(shape);
+    }
+
+    container.appendChild(svg);
+
+    // Leyenda: tema, minutos y porcentaje
+    const legend = document.createElement('ul');
+    legend.className = 'chart-legend';
+
+    for (let i = 0; i < slices.length; i++)
+    {
+        const slice = slices[i];
+        const percent = Math.round((slice.minutes / total) * 100);
+
+        const item = document.createElement('li');
+        item.className = 'chart-legend-item';
+
+        const swatch = document.createElement('span');
+        swatch.className = 'chart-swatch chart-color-' + Math.min(i + 1, CHART_COLOR_COUNT);
+
+        const name = document.createElement('span');
+        name.className = 'chart-legend-name';
+        name.textContent = getTopicLabel(slice.topic);
+
+        const value = document.createElement('span');
+        value.className = 'chart-legend-value';
+        value.textContent = formatChartMinutes(slice.minutes) + ' min · ' + percent + ' %';
+
+        item.appendChild(swatch);
+        item.appendChild(name);
+        item.appendChild(value);
+        legend.appendChild(item);
+    }
+
+    container.appendChild(legend);
+}
+
+// --- Gráfico de línea: minutos por semana ---
+
+// Un techo "redondo" para el eje: 100 en vez de 87
+function getNiceMax(value)
+{
+    if (!isFinite(value) || value <= 0) return 0;
+
+    const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+    const normalized = value / magnitude;
+    let nice;
+
+    if (normalized <= 1)
+    {
+        nice = 1;
+    }
+    else if (normalized <= 2)
+    {
+        nice = 2;
+    }
+    else if (normalized <= 5)
+    {
+        nice = 5;
+    }
+    else
+    {
+        nice = 10;
+    }
+
+    return nice * magnitude;
+}
+
+function renderLineChart(container, sessions)
+{
+    container.textContent = '';
+
+    const weeks = getWeeklyMinutes(sessions);
+    const width = 320;
+    const height = 210;
+    const paddingLeft = 36;
+    const paddingRight = 20;
+    const topSpace = 18;
+    const bottomSpace = 38;
+    const plotWidth = width - paddingLeft - paddingRight;
+    const plotHeight = height - topSpace - bottomSpace;
+    const baseline = topSpace + plotHeight;
+
+    let maxMinutes = 0;
+    for (const week of weeks)
+    {
+        if (week.minutes > maxMinutes)
+        {
+            maxMinutes = week.minutes;
+        }
+    }
+
+    const topValue = getNiceMax(maxMinutes);
+
+    const svg = createSvgElement('svg', {
+        'viewBox': '0 0 ' + width + ' ' + height,
+        'role': 'img'
+    });
+    addSvgTooltip(svg, 'Minutos estudiados por semana en las últimas ' + CHART_WEEKS + ' semanas');
+
+    // Rejilla y eje vertical
+    const gridValues = topValue > 0 ? [0, topValue / 2, topValue] : [0];
+
+    for (const value of gridValues)
+    {
+        const y = topValue > 0 ? baseline - (value / topValue) * plotHeight : baseline;
+
+        svg.appendChild(createSvgElement('line', {
+            'x1': paddingLeft,
+            'y1': y,
+            'x2': width - paddingRight,
+            'y2': y,
+            'class': 'chart-axis'
+        }));
+        svg.appendChild(createSvgText(formatChartMinutes(value), {
+            'x': paddingLeft - 6,
+            'y': y + 3,
+            'class': 'chart-label',
+            'text-anchor': 'end'
+        }));
+    }
+
+    // Puntos: uno por semana
+    const points = [];
+    for (let i = 0; i < weeks.length; i++)
+    {
+        const x = paddingLeft + (plotWidth / (weeks.length - 1)) * i;
+        const y = topValue > 0 ? baseline - (weeks[i].minutes / topValue) * plotHeight : baseline;
+        points.push({ x: x, y: y });
+    }
+
+    const pathData = [];
+    for (let i = 0; i < points.length; i++)
+    {
+        pathData.push((i === 0 ? 'M ' : 'L ') + points[i].x.toFixed(2) + ' ' + points[i].y.toFixed(2));
+    }
+
+    svg.appendChild(createSvgElement('path', {
+        'd': pathData.join(' '),
+        'class': 'chart-line'
+    }));
+
+    for (let i = 0; i < weeks.length; i++)
+    {
+        const week = weeks[i];
+        const point = points[i];
+
+        const circle = createSvgElement('circle', {
+            'cx': point.x,
+            'cy': point.y,
+            'r': 4,
+            'class': 'chart-point'
+        });
+        addSvgTooltip(circle, 'Semana ' + formatChartWeekRange(week) + ': '
+            + formatChartMinutes(week.minutes) + ' min');
+        svg.appendChild(circle);
+
+        svg.appendChild(createSvgText(formatChartMinutes(week.minutes), {
+            'x': point.x,
+            'y': point.y - 9,
+            'class': 'chart-value',
+            'text-anchor': 'middle'
+        }));
+
+        // Etiqueta de la semana: el lunes de esa semana.
+        // La última va alineada a la derecha para no salirse del dibujo.
+        const isLast = i === weeks.length - 1;
+
+        svg.appendChild(createSvgText(formatChartDayNumber(week.monday), {
+            'x': point.x,
+            'y': baseline + 16,
+            'class': 'chart-label',
+            'text-anchor': isLast ? 'end' : 'middle'
+        }));
+    }
+
+    container.appendChild(svg);
+}
+
+// --- Lista: temas más estudiados ---
+
+function renderTopTopics(list, sessions)
+{
+    list.textContent = '';
+
+    const groups = groupMinutesByTopic(sessions);
+
+    if (groups.length === 0)
+    {
+        const empty = document.createElement('li');
+        empty.className = 'empty-message';
+        empty.textContent = 'Todavía no hay temas registrados.';
+        list.appendChild(empty);
+        return;
+    }
+
+    for (let i = 0; i < groups.length; i++)
+    {
+        const group = groups[i];
+
+        const item = document.createElement('li');
+        item.className = 'top-item';
+
+        const rank = document.createElement('span');
+        rank.className = 'top-rank';
+        rank.textContent = (i + 1) + '.';
+
+        const name = document.createElement('span');
+        name.className = 'top-name';
+        name.textContent = getTopicLabel(group.topic);
+
+        const minutes = document.createElement('span');
+        minutes.className = 'top-minutes';
+        minutes.textContent = formatChartMinutes(group.minutes) + ' min';
+
+        const count = document.createElement('span');
+        count.className = 'top-sessions';
+        count.textContent = group.sessions === 1 ? '1 sesión' : group.sessions + ' sesiones';
+
+        item.appendChild(rank);
+        item.appendChild(name);
+        item.appendChild(minutes);
+        item.appendChild(count);
+        list.appendChild(item);
+    }
+}
+
+// --- Pintar la pestaña de gráficos ---
+
+function renderCharts()
+{
+    const emptyBox = document.getElementById('charts-empty');
+    const barContainer = document.getElementById('chart-barras');
+    const pieContainer = document.getElementById('chart-circular');
+    const lineContainer = document.getElementById('chart-linea');
+    const topList = document.getElementById('chart-top-temas');
+
+    if (!barContainer || !pieContainer || !lineContainer || !topList)
+    {
+        return;
+    }
+
+    const sessions = getChartSessions();
+
+    if (sessions.length === 0)
+    {
+        // Sin sesiones: se avisa y no se dibuja ningún gráfico
+        if (emptyBox)
+        {
+            emptyBox.hidden = false;
+        }
+
+        barContainer.textContent = '';
+        pieContainer.textContent = '';
+        lineContainer.textContent = '';
+        topList.textContent = '';
+        return;
+    }
+
+    if (emptyBox)
+    {
+        emptyBox.hidden = true;
+    }
+
+    renderBarChart(barContainer, sessions);
+    renderPieChart(pieContainer, sessions);
+    renderLineChart(lineContainer, sessions);
+    renderTopTopics(topList, sessions);
+}
+
 // Inicializar
 dateInput.value = getTodayLocal();
 loadTheme();
@@ -1184,4 +2261,6 @@ updateBestStreak();
 updateWeekTotal();
 updateSessionList();
 renderAgents();
+restoreTimer();
+showTab('diario');
 

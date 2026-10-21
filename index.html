@@ -17,61 +17,134 @@
             </div>
         </div>
 
-        <!-- Racha -->
-        <div class="streak-box">
-            <span class="streak-number" id="streak">0</span>
-            <span class="streak-label">días de racha 🔥</span>
-            <div class="streak-best">
-                <span class="streak-best-number" id="best-streak">0</span>
-                <span class="streak-best-label">mejor racha 🏆</span>
-            </div>
-            <div class="streak-week">
-                <span class="streak-week-number" id="week-minutes">0</span>
-                <span class="streak-week-label">minutos esta semana ⏱️</span>
-            </div>
-        </div>
+        <!-- Pestañas -->
+        <nav class="tabs" role="tablist" aria-label="Secciones">
+            <button type="button" class="tab-button active" data-tab="diario" role="tab" aria-selected="true">📚 Diario</button>
+            <button type="button" class="tab-button" data-tab="cronometro" role="tab" aria-selected="false">⏱️ Cronómetro</button>
+            <button type="button" class="tab-button" data-tab="graficos" role="tab" aria-selected="false">📊 Gráficos</button>
+        </nav>
 
-        <!-- Formulario -->
-        <form id="study-form">
-            <div class="form-group">
-                <label for="date">Fecha</label>
-                <input type="date" id="date" required>
+        <!-- Pestaña: Diario -->
+        <section id="panel-diario" class="panel" role="tabpanel">
+            <!-- Racha -->
+            <div class="streak-box">
+                <span class="streak-number" id="streak">0</span>
+                <span class="streak-label">días de racha 🔥</span>
+                <div class="streak-best">
+                    <span class="streak-best-number" id="best-streak">0</span>
+                    <span class="streak-best-label">mejor racha 🏆</span>
+                </div>
+                <div class="streak-week">
+                    <span class="streak-week-number" id="week-minutes">0</span>
+                    <span class="streak-week-label">minutos esta semana ⏱️</span>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="topic">Tema</label>
-                <input type="text" id="topic" placeholder="¿Qué estudiaste?" required>
-            </div>
-            <div class="form-group">
-                <label for="minutes">Minutos</label>
-                <input type="number" id="minutes" min="1" placeholder="30" required>
-            </div>
-            <button type="submit">Registrar sesión</button>
-            <p id="form-message" class="form-message" hidden></p>
-        </form>
 
-        <!-- Lista de sesiones -->
-        <h2>Sesiones</h2>
-        <ul id="session-list"></ul>
+            <!-- Formulario -->
+            <form id="study-form">
+                <div class="form-group">
+                    <label for="date">Fecha</label>
+                    <input type="date" id="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="topic">Tema</label>
+                    <input type="text" id="topic" placeholder="¿Qué estudiaste?" required>
+                </div>
+                <div class="form-group">
+                    <label for="minutes">Minutos</label>
+                    <input type="number" id="minutes" min="1" placeholder="30" required>
+                </div>
+                <button type="submit">Registrar sesión</button>
+                <p id="form-message" class="form-message" hidden></p>
+            </form>
 
-        <!-- Agentes -->
-        <div class="agents">
-            <h2>🤖 Agentes</h2>
-            <ul id="agent-list" class="agent-list"></ul>
-            <p class="agents-note">
-                Cada agente tiene una zona de código reservada y no toca la de los demás.
-                El protocolo de delegación está en <code>manageste.md</code>.
+            <!-- Lista de sesiones -->
+            <h2>Sesiones</h2>
+            <ul id="session-list"></ul>
+
+            <!-- Agentes -->
+            <div class="agents">
+                <h2>🤖 Agentes</h2>
+                <ul id="agent-list" class="agent-list"></ul>
+                <p class="agents-note">
+                    Cada agente tiene una zona de código reservada y no toca la de los demás.
+                    El protocolo de delegación está en <code>manageste.md</code>.
+                </p>
+            </div>
+
+            <!-- Términos y Condiciones -->
+            <div class="terms">
+                <h3>Términos y Condiciones</h3>
+                <p>1. Esta aplicación es una herramienta personal de registro de estudio.</p>
+                <p>2. Los datos se almacenan únicamente en tu navegador (localStorage).</p>
+                <p>3. No se recopila ni se envía información a terceros.</p>
+                <p>4. El uso de esta aplicación es bajo tu propia responsabilidad.</p>
+                <p>5. Puedes eliminar tus datos en cualquier momento borrando los datos del navegador.</p>
+            </div>
+        </section>
+
+        <!-- Pestaña: Cronómetro -->
+        <section id="panel-cronometro" class="panel" role="tabpanel" hidden>
+            <h2>⏱️ Cronómetro</h2>
+            <p class="panel-note">
+                Dime cuántos minutos quieres estudiar y la cuenta atrás te avisa cuando se acaben.
             </p>
-        </div>
 
-        <!-- Términos y Condiciones -->
-        <div class="terms">
-            <h3>Términos y Condiciones</h3>
-            <p>1. Esta aplicación es una herramienta personal de registro de estudio.</p>
-            <p>2. Los datos se almacenan únicamente en tu navegador (localStorage).</p>
-            <p>3. No se recopila ni se envía información a terceros.</p>
-            <p>4. El uso de esta aplicación es bajo tu propia responsabilidad.</p>
-            <p>5. Puedes eliminar tus datos en cualquier momento borrando los datos del navegador.</p>
-        </div>
+            <div class="timer-display" id="timer-display">00:00</div>
+            <p class="timer-total" id="timer-total" hidden></p>
+
+            <div class="timer-fields">
+                <div class="form-group">
+                    <label for="timer-minutes">Minutos</label>
+                    <input type="number" id="timer-minutes" min="1" max="600" step="1" value="39" inputmode="numeric">
+                </div>
+                <div class="form-group">
+                    <label for="timer-topic">Tema (opcional)</label>
+                    <input type="text" id="timer-topic" placeholder="¿Qué vas a estudiar?">
+                </div>
+            </div>
+
+            <div class="timer-actions">
+                <button type="button" id="timer-start" class="timer-btn primary">Empezar</button>
+                <button type="button" id="timer-pause" class="timer-btn" disabled>Pausar</button>
+                <button type="button" id="timer-reset" class="timer-btn">Reiniciar</button>
+            </div>
+
+            <p id="timer-message" class="form-message" hidden></p>
+
+            <div id="timer-done" class="timer-done" hidden>
+                <p class="timer-done-text">⏰ ¡Se acabó el tiempo!</p>
+                <button type="button" id="timer-save" class="timer-btn primary">Registrar esta sesión</button>
+            </div>
+        </section>
+
+        <!-- Pestaña: Gráficos -->
+        <section id="panel-graficos" class="panel" role="tabpanel" hidden>
+            <h2>📊 Estadísticas</h2>
+            <p id="charts-empty" class="empty-message" hidden>
+                Todavía no hay sesiones registradas. Cuando registres alguna, aquí verás tus gráficos.
+            </p>
+
+            <div class="chart-block">
+                <h3>Minutos por día (últimos 7 días)</h3>
+                <div id="chart-barras" class="chart"></div>
+            </div>
+
+            <div class="chart-block">
+                <h3>Reparto por tema</h3>
+                <div id="chart-circular" class="chart"></div>
+            </div>
+
+            <div class="chart-block">
+                <h3>Minutos por semana (últimas 8 semanas)</h3>
+                <div id="chart-linea" class="chart"></div>
+            </div>
+
+            <div class="chart-block">
+                <h3>Temas más estudiados</h3>
+                <ol id="chart-top-temas" class="top-list"></ol>
+            </div>
+        </section>
     </div>
 
     <!-- Modal de acceso -->

@@ -628,3 +628,471 @@ body.dark .agent-status.terminado
     color: #999;
     line-height: 1.4;
 }
+
+/* Pestañas */
+.tabs
+{
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    flex-wrap: wrap;
+}
+
+body.dark .tabs
+{
+    border-bottom-color: #0f3460;
+}
+
+.tab-button
+{
+    flex: 1;
+    min-width: 90px;
+    padding: 10px 8px;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    background: #fafafa;
+    color: #666;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+body.dark .tab-button
+{
+    background: #1f2a4a;
+    border-color: #0f3460;
+    color: #aaa;
+}
+
+.tab-button:hover
+{
+    border-color: #667eea;
+}
+
+.tab-button.active
+{
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+    font-weight: bold;
+}
+
+/* Paneles de las pestañas */
+.panel
+{
+    display: block;
+}
+
+/* Sin esto el panel seguiría visible: la regla de arriba gana al [hidden] del navegador */
+.panel[hidden]
+{
+    display: none;
+}
+
+.panel-note
+{
+    font-size: 0.85em;
+    color: #888;
+    line-height: 1.4;
+    margin-bottom: 16px;
+}
+
+/* Cronómetro */
+.timer-display
+{
+    text-align: center;
+    font-size: 3.2em;
+    font-weight: bold;
+    color: #667eea;
+    font-variant-numeric: tabular-nums;
+    margin: 10px 0;
+}
+
+.timer-total
+{
+    text-align: center;
+    font-size: 0.85em;
+    color: #888;
+    margin-bottom: 16px;
+}
+
+.timer-fields
+{
+    display: flex;
+    gap: 12px;
+}
+
+.timer-fields .form-group
+{
+    flex: 1;
+    min-width: 0;
+}
+
+.timer-actions
+{
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.timer-btn
+{
+    flex: 1;
+    min-width: 100px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: white;
+    color: #333;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+body.dark .timer-btn
+{
+    background: #1f2a4a;
+    border-color: #0f3460;
+    color: #ddd;
+}
+
+.timer-btn.primary
+{
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+    font-weight: bold;
+}
+
+.timer-btn:hover:not(:disabled)
+{
+    border-color: #667eea;
+}
+
+.timer-btn:disabled
+{
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.timer-done
+{
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid #667eea;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.timer-done-text
+{
+    color: #667eea;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+/* ---------- Gráficos ---------- */
+.chart-block
+{
+    margin-bottom: 28px;
+}
+
+.chart-block h3
+{
+    font-size: 0.95em;
+    color: #555;
+    margin-bottom: 10px;
+}
+
+body.dark .chart-block h3
+{
+    color: #aaa;
+}
+
+.chart
+{
+    width: 100%;
+}
+
+.chart svg
+{
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Textos y líneas de los gráficos */
+.chart-label
+{
+    fill: #888;
+    font-size: 10px;
+}
+
+.chart-value
+{
+    fill: #667eea;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.chart-axis
+{
+    stroke: #e0e0e0;
+    stroke-width: 1;
+}
+
+.chart-tick
+{
+    fill: #dcdcdc;
+}
+
+.chart-bar
+{
+    fill: #667eea;
+}
+
+.chart-line
+{
+    fill: none;
+    stroke: #667eea;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.chart-point
+{
+    fill: #ffffff;
+    stroke: #667eea;
+    stroke-width: 2;
+}
+
+.chart-slice
+{
+    stroke: #ffffff;
+    stroke-width: 1;
+}
+
+/* Colores de las porciones del gráfico circular */
+.chart-color-1
+{
+    fill: #667eea;
+    background-color: #667eea;
+}
+
+.chart-color-2
+{
+    fill: #ff6b6b;
+    background-color: #ff6b6b;
+}
+
+.chart-color-3
+{
+    fill: #ffa726;
+    background-color: #ffa726;
+}
+
+.chart-color-4
+{
+    fill: #26a69a;
+    background-color: #26a69a;
+}
+
+.chart-color-5
+{
+    fill: #ab47bc;
+    background-color: #ab47bc;
+}
+
+.chart-color-6
+{
+    fill: #78909c;
+    background-color: #78909c;
+}
+
+body.dark .chart-label
+{
+    fill: #8a8a8a;
+}
+
+body.dark .chart-value
+{
+    fill: #aab4ff;
+}
+
+body.dark .chart-axis
+{
+    stroke: #0f3460;
+}
+
+body.dark .chart-tick
+{
+    fill: #24406e;
+}
+
+body.dark .chart-bar
+{
+    fill: #8b9dff;
+}
+
+body.dark .chart-line
+{
+    stroke: #8b9dff;
+}
+
+body.dark .chart-point
+{
+    fill: #16213e;
+    stroke: #8b9dff;
+}
+
+body.dark .chart-slice
+{
+    stroke: #16213e;
+}
+
+body.dark .chart-color-1
+{
+    fill: #8b9dff;
+    background-color: #8b9dff;
+}
+
+body.dark .chart-color-2
+{
+    fill: #ff8f8f;
+    background-color: #ff8f8f;
+}
+
+body.dark .chart-color-3
+{
+    fill: #ffbe6b;
+    background-color: #ffbe6b;
+}
+
+body.dark .chart-color-4
+{
+    fill: #4fd1c5;
+    background-color: #4fd1c5;
+}
+
+body.dark .chart-color-5
+{
+    fill: #ce93d8;
+    background-color: #ce93d8;
+}
+
+body.dark .chart-color-6
+{
+    fill: #90a4ae;
+    background-color: #90a4ae;
+}
+
+/* Leyenda del gráfico circular */
+.chart-legend
+{
+    list-style: none;
+    margin-top: 12px;
+    padding: 0;
+}
+
+.chart-legend-item
+{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 2px;
+    font-size: 0.85em;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+body.dark .chart-legend-item
+{
+    border-bottom-color: #0f3460;
+}
+
+.chart-swatch
+{
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex: 0 0 auto;
+}
+
+.chart-legend-name
+{
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.chart-legend-value
+{
+    color: #888;
+    white-space: nowrap;
+}
+
+/* Lista de temas más estudiados */
+.top-list
+{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.top-item
+{
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 0.9em;
+}
+
+body.dark .top-item
+{
+    border-bottom-color: #0f3460;
+}
+
+.top-item:last-child
+{
+    border-bottom: none;
+}
+
+.top-rank
+{
+    color: #999;
+    min-width: 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+.top-name
+{
+    flex: 1;
+    min-width: 0;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.top-minutes
+{
+    color: #667eea;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.top-sessions
+{
+    color: #888;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+body.dark .top-minutes
+{
+    color: #aab4ff;
+}

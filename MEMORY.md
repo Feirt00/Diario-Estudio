@@ -10,9 +10,12 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Sigue abierto **por diseño y sin arreglo posible** sin backend: C1/C2 (el rate limit se puede resetear
   borrando su clave), C7 (la sesión no caduca), C8 (la app no está protegida), B3 residual (suplantar a un
   usuario que sí existe). Documentados como limitaciones aceptadas en `AGENTS.md`.
-- Equipo de 4: **Zeirt** (padre) + 3 agentes con zonas reservadas. Reparto y estado en `manageste.md`.
+- Equipo de 5: **Zeirt** (padre) + 4 agentes con zonas reservadas. Reparto y estado en `manageste.md`.
   La app tiene un apartado "🤖 Agentes" (array `AGENTS` en `app.js`) que muestra quién hace qué.
-- Claves en localStorage (prefijo `diario-estudio-`): `sesiones`, `tema`, `usuarios`, `sesion`, `login-intentos`. Sin prefijo es un error.
+- v1.5: la app tiene **tres pestañas** (Diario, Cronómetro, Gráficos). Zeirt hizo las pestañas y el
+  cronómetro (cuenta atrás con la hora real, sonido al terminar y registro directo en el diario);
+  el Agente 4 hizo los gráficos en SVG a mano.
+- Claves en localStorage (prefijo `diario-estudio-`): `sesiones`, `tema`, `usuarios`, `sesion`, `login-intentos`, `cronometro`. Sin prefijo es un error.
 - Todo en `index.html` + `styles.css` + `app.js`. Sin build, sin dependencias, sin tests en el repo.
 - Versionado: rama `master` (orphan) → `https://github.com/Feirt00/Agentes.git`. En ese repo `main`
   es otra cosa: no mezclarla ni borrarla. GitHub Desktop descartado: se versiona por CLI y web.
@@ -32,6 +35,10 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - CSP con `file:` en la lista de fuentes: en `file://` el origen es opaco y `'self'` solo bloquearía `app.js`.
 - Delegar en agentes con zonas reservadas: dos agentes pueden tocar el mismo archivo a la vez sin pisarse.
   El padre (Zeirt) verifica el diff y las pruebas antes de dar por bueno nada.
+- La cuenta atrás del cronómetro se calcula con la **hora real** (`Date.now()`), no con un contador: `setInterval`
+  se desvía y en segundo plano se para. El estado se guarda en `diario-estudio-cronometro` para sobrevivir a la pestaña.
+- Los gráficos se dibujan **a mano con SVG**: nada de Chart.js ni CDN, para que la app siga siendo local y sin red.
+  Los colores van con clases CSS (con su variante `body.dark`), nunca en línea.
 
 ## Aprendizajes y errores a evitar
 - **Al probar en un navegador automatizado, sirve la carpeta con `Cache-Control: no-store`**: si el
@@ -55,6 +62,8 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Validaciones y rate limit van DENTRO de `registerUser()`/`loginUser()`, no en el evento del formulario.
 - `app.js` tiene finales de línea mezclados (CRLF y LF): no normalizar el archivo entero (diff gigante).
 - Al concatenar o reescribir con PowerShell 5.1 se rompen acentos y emojis: usar el editor de opencode.
+- Una regla CSS con clase (`.panel { display: block }`) **gana al `[hidden]` del navegador**: si usas `hidden`
+  para ocultar paneles, hay que añadir `.panel[hidden] { display: none }` o no se ocultan.
 
 ## Próximos pasos
 - Terminar la fase 2 de la auditoría con el informe del Inspector (Agente 3) y cerrar sus hallazgos.
