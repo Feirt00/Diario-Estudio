@@ -2044,13 +2044,16 @@ function getChartSessions()
 }
 
 // Minutos y sesiones de cada tema, de más a menos minutos
+// Agrupa por clave normalizada (minúsculas, sin espacios al inicio/fin) y usa la primera
+// forma original como etiqueta visible (respeta la capitalización que usó Feirt).
 function groupMinutesByTopic(sessions)
 {
     const totals = new Map();
 
     for (const session of sessions)
     {
-        const current = totals.get(session.topic);
+        const normalizedKey = session.topic.trim().toLowerCase();
+        const current = totals.get(normalizedKey);
 
         if (current)
         {
@@ -2059,7 +2062,8 @@ function groupMinutesByTopic(sessions)
         }
         else
         {
-            totals.set(session.topic, { topic: session.topic, minutes: session.minutes, sessions: 1 });
+            // Guardamos el topic original tal como aparece la primera vez
+            totals.set(normalizedKey, { topic: session.topic, minutes: session.minutes, sessions: 1 });
         }
     }
 
