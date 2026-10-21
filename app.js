@@ -5,6 +5,7 @@ const topicInput = document.getElementById('topic');
 const minutesInput = document.getElementById('minutes');
 const streakDisplay = document.getElementById('streak');
 const bestStreakDisplay = document.getElementById('best-streak');
+const weekMinutesDisplay = document.getElementById('week-minutes');
 const sessionList = document.getElementById('session-list');
 const themeToggle = document.getElementById('theme-toggle');
 const authStatus = document.getElementById('auth-status');
@@ -35,22 +36,21 @@ const MIN_USERNAME = 3;
 const MAX_USERNAME = 20;
 
 // Obtener fecha de hoy en formato local (YYYY-MM-DD)
-function getTodayLocal() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+function getTodayLocal()
+{
+    return toLocalDateString(new Date());
 }
 
 // Convertir fecha local a objeto Date (medianoche local)
-function parseLocalDate(dateStr) {
+function parseLocalDate(dateStr)
+{
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
 }
 
 // Formatear fecha para mostrar
-function formatDate(dateStr) {
+function formatDate(dateStr)
+{
     const date = parseLocalDate(dateStr);
     return date.toLocaleDateString('es-ES', {
         weekday: 'short',
@@ -59,19 +59,31 @@ function formatDate(dateStr) {
     });
 }
 
+// Pasar un objeto Date a texto AAAA-MM-DD (fecha local)
+function toLocalDateString(date)
+{
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Cargar sesiones desde localStorage
-function loadSessions() {
+function loadSessions()
+{
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
 }
 
 // Guardar sesiones en localStorage
-function saveSessions(sessions) {
+function saveSessions(sessions)
+{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
 }
 
 // Calcular racha actual
-function calculateStreak(sessions) {
+function calculateStreak(sessions)
+{
     if (sessions.length === 0) return 0;
 
     const studyDates = new Set(sessions.map(s => s.date));
@@ -83,13 +95,17 @@ function calculateStreak(sessions) {
 
     let currentDate = studyDates.has(getTodayLocal()) ? today : yesterday;
 
-    while (true) {
+    while (true)
+    {
         const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
 
-        if (studyDates.has(dateStr)) {
+        if (studyDates.has(dateStr))
+        {
             streak++;
             currentDate.setDate(currentDate.getDate() - 1);
-        } else {
+        }
+        else
+        {
             break;
         }
     }
@@ -98,22 +114,26 @@ function calculateStreak(sessions) {
 }
 
 // Calcular mejor racha (máxima histórica)
-function calculateBestStreak(sessions) {
+function calculateBestStreak(sessions)
+{
     if (sessions.length === 0) return 0;
 
     const todayStr = getTodayLocal();
     const studyDatesSet = new Set();
 
-    for (let i = 0; i < sessions.length; i++) {
+    for (let i = 0; i < sessions.length; i++)
+    {
         const dateStr = sessions[i].date;
-        if (dateStr > todayStr) {
+        if (dateStr > todayStr)
+        {
             continue;
         }
         studyDatesSet.add(dateStr);
     }
 
     const studyDatesList = [];
-    for (let dateStr of studyDatesSet) {
+    for (let dateStr of studyDatesSet)
+    {
         studyDatesList.push(dateStr);
     }
 
@@ -124,7 +144,8 @@ function calculateBestStreak(sessions) {
     let bestStreak = 1;
     let currentStreak = 1;
 
-    for (let i = 1; i < studyDatesList.length; i++) {
+    for (let i = 1; i < studyDatesList.length; i++)
+    {
         const prevDate = parseLocalDate(studyDatesList[i - 1]);
         const currDate = parseLocalDate(studyDatesList[i]);
 
@@ -133,37 +154,79 @@ function calculateBestStreak(sessions) {
 
         if (currDate.getFullYear() === prevNext.getFullYear() &&
             currDate.getMonth() === prevNext.getMonth() &&
-            currDate.getDate() === prevNext.getDate()) {
+            currDate.getDate() === prevNext.getDate())
+            {
             currentStreak++;
-        } else {
-            if (currentStreak > bestStreak) {
+        }
+        else
+        {
+            if (currentStreak > bestStreak)
+            {
                 bestStreak = currentStreak;
             }
             currentStreak = 1;
         }
     }
 
-    if (currentStreak > bestStreak) {
+    if (currentStreak > bestStreak)
+    {
         bestStreak = currentStreak;
     }
 
     return bestStreak;
 }
 
+// Obtener el lunes de esta semana en formato local (AAAA-MM-DD).
+// getDay() da 0 para el domingo, así que del domingo al lunes hay 6 días.
+function getWeekStart()
+{
+    const date = parseLocalDate(getTodayLocal());
+    const daysSinceMonday = (date.getDay() + 6) % 7;
+    date.setDate(date.getDate() - daysSinceMonday);
+    return toLocalDateString(date);
+}
+
+// Calcular los minutos estudiados esta semana (del lunes a hoy).
+// Las fechas ya vienen en AAAA-MM-DD, así que se comparan como texto.
+function calculateWeekMinutes(sessions)
+{
+    const weekStart = getWeekStart();
+    const today = getTodayLocal();
+
+    let total = 0;
+    for (const session of sessions)
+    {
+        if (session.date >= weekStart && session.date <= today)
+        {
+            total += Number(session.minutes);
+        }
+    }
+    return total;
+}
+
 // Actualizar rachas en pantalla
-function updateStreak() {
+function updateStreak()
+{
     const sessions = loadSessions();
     streakDisplay.textContent = calculateStreak(sessions);
 }
 
-function updateBestStreak() {
+function updateBestStreak()
+{
     const sessions = loadSessions();
     bestStreakDisplay.textContent = calculateBestStreak(sessions);
 }
 
+function updateWeekTotal()
+{
+    const sessions = loadSessions();
+    weekMinutesDisplay.textContent = calculateWeekMinutes(sessions);
+}
+
 // Crear el <li> de una sesión. Los datos van con textContent para que
 // un tema con "<" o comillas no rompa el HTML.
-function createSessionItem(session) {
+function createSessionItem(session)
+{
     const item = document.createElement('li');
 
     const date = document.createElement('span');
@@ -186,7 +249,8 @@ function createSessionItem(session) {
 }
 
 // Actualizar lista de sesiones
-function updateSessionList() {
+function updateSessionList()
+{
     const sessions = loadSessions();
 
     sessions.sort((a, b) => b.date.localeCompare(a.date));
@@ -194,7 +258,8 @@ function updateSessionList() {
     // Se vacía la lista y se vuelve a pintar
     sessionList.textContent = '';
 
-    if (sessions.length === 0) {
+    if (sessions.length === 0)
+    {
         const empty = document.createElement('li');
         empty.className = 'empty-message';
         empty.textContent = 'Aún no hay sesiones registradas';
@@ -202,20 +267,23 @@ function updateSessionList() {
         return;
     }
 
-    for (const session of sessions) {
+    for (const session of sessions)
+    {
         sessionList.appendChild(createSessionItem(session));
     }
 }
 
 // Manejar envío del formulario
-form.addEventListener('submit', (e) => {
+form.addEventListener('submit', (e) =>
+{
     e.preventDefault();
 
     const date = dateInput.value;
     const topic = topicInput.value.trim();
     const minutes = parseInt(minutesInput.value);
 
-    if (!date || !topic || !minutes || minutes <= 0) {
+    if (!date || !topic || !minutes || minutes <= 0)
+    {
         alert('Por favor, completa todos los campos correctamente.');
         return;
     }
@@ -230,11 +298,13 @@ form.addEventListener('submit', (e) => {
 
     updateStreak();
     updateBestStreak();
+    updateWeekTotal();
     updateSessionList();
 });
 
 // Tema claro/oscuro
-function toggleTheme() {
+function toggleTheme()
+{
     document.body.classList.toggle('dark');
     const isDark = document.body.classList.contains('dark');
     themeToggle.textContent = isDark ? '☀️' : '🌙';
@@ -242,9 +312,11 @@ function toggleTheme() {
 }
 
 // Cargar tema guardado
-function loadTheme() {
+function loadTheme()
+{
     const savedTheme = localStorage.getItem(THEME_KEY);
-    if (savedTheme === 'dark') {
+    if (savedTheme === 'dark')
+    {
         document.body.classList.add('dark');
         themeToggle.textContent = '☀️';
     }
@@ -257,82 +329,98 @@ themeToggle.addEventListener('click', toggleTheme);
 // ============================================================
 
 // Convertir el nombre de usuario a una clave sin mayúsculas ni espacios
-function usernameKey(username) {
+function usernameKey(username)
+{
     return username.trim().toLowerCase();
 }
 
 // Hash sencillo de la contraseña. No es criptografía real:
 // solo evita que la contraseña se lea en claro al abrir el navegador.
-function hashPassword(usernameKeyValue, password) {
+function hashPassword(usernameKeyValue, password)
+{
     const text = SALT + usernameKeyValue + password;
     let hash = 2166136261;
-    for (let i = 0; i < text.length; i++) {
+    for (let i = 0; i < text.length; i++)
+    {
         hash ^= text.charCodeAt(i);
         hash = (hash * 16777619) >>> 0;
     }
     return hash.toString(16);
 }
 
-function loadUsers() {
+function loadUsers()
+{
     const data = localStorage.getItem(USERS_KEY);
     return data ? JSON.parse(data) : [];
 }
 
-function saveUsers(users) {
+function saveUsers(users)
+{
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
-function getCurrentUser() {
+function getCurrentUser()
+{
     const data = localStorage.getItem(SESSION_KEY);
     return data ? JSON.parse(data) : null;
 }
 
-function setSession(username) {
+function setSession(username)
+{
     localStorage.setItem(SESSION_KEY, JSON.stringify({
         username: username,
         loggedInAt: getTodayLocal()
     }));
 }
 
-function clearSession() {
+function clearSession()
+{
     localStorage.removeItem(SESSION_KEY);
 }
 
 // Intentos fallidos de acceso
-function loadAttempts() {
+function loadAttempts()
+{
     const data = localStorage.getItem(ATTEMPTS_KEY);
     if (!data) return { count: 0, blockedUntil: 0 };
     return JSON.parse(data);
 }
 
-function saveAttempts(attempts) {
+function saveAttempts(attempts)
+{
     localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
 }
 
 // Segundos que quedan de bloqueo (0 si no está bloqueado)
-function secondsLeftBlocked() {
+function secondsLeftBlocked()
+{
     const attempts = loadAttempts();
     const left = Math.ceil((attempts.blockedUntil - Date.now()) / 1000);
     return left > 0 ? left : 0;
 }
 
-function registerFailedAttempt() {
+function registerFailedAttempt()
+{
     const attempts = loadAttempts();
     attempts.count = attempts.count + 1;
-    if (attempts.count >= MAX_ATTEMPTS) {
+    if (attempts.count >= MAX_ATTEMPTS)
+    {
         attempts.blockedUntil = Date.now() + BLOCK_SECONDS * 1000;
     }
     saveAttempts(attempts);
 }
 
-function clearAttempts() {
+function clearAttempts()
+{
     saveAttempts({ count: 0, blockedUntil: 0 });
 }
 
 // Mostrar el usuario conectado o el enlace de acceso
-function renderAuthStatus() {
+function renderAuthStatus()
+{
     const user = getCurrentUser();
-    if (user) {
+    if (user)
+    {
         authStatus.innerHTML = '';
         const name = document.createElement('span');
         name.className = 'auth-username';
@@ -343,7 +431,9 @@ function renderAuthStatus() {
         exit.textContent = 'Cerrar sesión';
         authStatus.appendChild(name);
         authStatus.appendChild(exit);
-    } else {
+    }
+    else
+    {
         authStatus.innerHTML = '<span class="auth-link" id="login-link">Iniciar sesión</span>';
     }
 }
@@ -353,8 +443,10 @@ function renderAuthStatus() {
 // 'login' o 'register'
 let authMode = 'login';
 
-function setAuthMessage(text, type) {
-    if (!text) {
+function setAuthMessage(text, type)
+{
+    if (!text)
+    {
         authMessage.hidden = true;
         authMessage.textContent = '';
         return;
@@ -364,19 +456,23 @@ function setAuthMessage(text, type) {
     authMessage.className = 'auth-message ' + type;
 }
 
-function setAuthMode(mode) {
+function setAuthMode(mode)
+{
     authMode = mode;
     setAuthMessage('');
     clearAuthForm();
     updateRateLimitUI();
 
-    if (mode === 'login') {
+    if (mode === 'login')
+    {
         authTitle.textContent = 'Iniciar sesión';
         authSubmit.textContent = 'Entrar';
         authPassword.setAttribute('placeholder', 'Tu contraseña');
         authToggleText.textContent = '¿No tienes cuenta?';
         authToggleLink.textContent = 'Crear usuario';
-    } else {
+    }
+    else
+    {
         authTitle.textContent = 'Crear usuario';
         authSubmit.textContent = 'Crear cuenta';
         authPassword.setAttribute('placeholder', 'Mínimo ' + MIN_PASSWORD + ' caracteres');
@@ -385,33 +481,40 @@ function setAuthMode(mode) {
     }
 }
 
-function clearAuthForm() {
+function clearAuthForm()
+{
     authUsername.value = '';
     authPassword.value = '';
 }
 
 // Activar o desactivar el formulario según el bloqueo por intentos
-function updateRateLimitUI() {
+function updateRateLimitUI()
+{
     const left = secondsLeftBlocked();
-    if (left > 0) {
+    if (left > 0)
+    {
         authSubmit.disabled = true;
         authUsername.disabled = true;
         authPassword.disabled = true;
         setAuthMessage('Demasiados intentos fallidos. Inténtalo de nuevo en ' + left + ' s.', 'error');
-    } else {
+    }
+    else
+    {
         authSubmit.disabled = false;
         authUsername.disabled = false;
         authPassword.disabled = false;
     }
 }
 
-function openAuthModal(mode) {
+function openAuthModal(mode)
+{
     authModal.hidden = false;
     setAuthMode(mode);
     authUsername.focus();
 }
 
-function closeAuthModal() {
+function closeAuthModal()
+{
     authModal.hidden = true;
     setAuthMessage('');
 }
@@ -419,17 +522,22 @@ function closeAuthModal() {
 // ---------- Acciones ----------
 
 // Devuelve { ok, message }. Nunca lanza errores: siempre un mensaje para el usuario.
-function registerUser(username, password) {
-    if (!username || !password) {
+function registerUser(username, password)
+{
+    if (!username || !password)
+    {
         return { ok: false, message: 'Completa ambos campos.' };
     }
-    if (username.length < MIN_USERNAME || username.length > MAX_USERNAME) {
+    if (username.length < MIN_USERNAME || username.length > MAX_USERNAME)
+    {
         return { ok: false, message: 'El usuario debe tener entre ' + MIN_USERNAME + ' y ' + MAX_USERNAME + ' caracteres.' };
     }
-    if (/\s/.test(username)) {
+    if (/\s/.test(username))
+    {
         return { ok: false, message: 'El usuario no puede tener espacios.' };
     }
-    if (password.length < MIN_PASSWORD) {
+    if (password.length < MIN_PASSWORD)
+    {
         return { ok: false, message: 'La contraseña necesita al menos ' + MIN_PASSWORD + ' caracteres.' };
     }
 
@@ -437,7 +545,8 @@ function registerUser(username, password) {
     const key = usernameKey(username);
 
     const exists = users.some(user => user.usernameKey === key);
-    if (exists) {
+    if (exists)
+    {
         return { ok: false, message: 'Ese nombre de usuario ya existe.' };
     }
 
@@ -452,14 +561,17 @@ function registerUser(username, password) {
     return { ok: true, message: '¡Cuenta creada! Bienvenido, ' + username + '.' };
 }
 
-function loginUser(username, password) {
+function loginUser(username, password)
+{
     // Bloqueo por intentos: no se comprueba nada mientras dure
     const left = secondsLeftBlocked();
-    if (left > 0) {
+    if (left > 0)
+    {
         return { ok: false, message: 'Demasiados intentos fallidos. Inténtalo de nuevo en ' + left + ' s.', blocked: true };
     }
 
-    if (!username || !password) {
+    if (!username || !password)
+    {
         return { ok: false, message: 'Completa ambos campos.' };
     }
 
@@ -470,7 +582,8 @@ function loginUser(username, password) {
     // Mensaje genérico: no revela si el usuario existe
     const fail = { ok: false, message: 'Usuario o contraseña incorrectos.' };
 
-    if (user && user.passwordHash === hashPassword(key, password)) {
+    if (user && user.passwordHash === hashPassword(key, password))
+    {
         clearAttempts();
         setSession(user.username);
         return { ok: true, message: 'Sesión iniciada.' };
@@ -480,54 +593,68 @@ function loginUser(username, password) {
     return fail;
 }
 
-function logoutUser() {
+function logoutUser()
+{
     clearSession();
     renderAuthStatus();
 }
 
 // ---------- Eventos ----------
 
-authStatus.addEventListener('click', (e) => {
-    if (e.target.id === 'login-link') {
+authStatus.addEventListener('click', (e) =>
+{
+    if (e.target.id === 'login-link')
+    {
         openAuthModal('login');
-    } else if (e.target.id === 'logout-link') {
+    }
+    else if (e.target.id === 'logout-link')
+    {
         logoutUser();
     }
 });
 
 authClose.addEventListener('click', closeAuthModal);
 
-authModal.addEventListener('click', (e) => {
-    if (e.target === authModal) {
+authModal.addEventListener('click', (e) =>
+{
+    if (e.target === authModal)
+    {
         closeAuthModal();
     }
 });
 
-authToggleLink.addEventListener('click', (e) => {
+authToggleLink.addEventListener('click', (e) =>
+{
     e.preventDefault();
     setAuthMode(authMode === 'login' ? 'register' : 'login');
 });
 
-authForm.addEventListener('submit', (e) => {
+authForm.addEventListener('submit', (e) =>
+{
     e.preventDefault();
 
     const result = authMode === 'register'
         ? registerUser(authUsername.value.trim(), authPassword.value)
         : loginUser(authUsername.value.trim(), authPassword.value);
 
-    if (result.ok) {
+    if (result.ok)
+    {
         setAuthMessage(result.message, 'success');
         renderAuthStatus();
         setTimeout(closeAuthModal, 600);
-    } else {
+    }
+    else
+    {
         setAuthMessage(result.message, 'error');
         updateRateLimitUI();
     }
 });
 
 // Cuenta atrás mientras el bloqueo siga activo
-setInterval(() => {
-    if (!authModal.hidden && secondsLeftBlocked() > 0) {
+setInterval(() =>
+{
+    if (!authModal.hidden && secondsLeftBlocked() > 0)
+    {
         updateRateLimitUI();
     }
 }, 1000);
@@ -538,5 +665,6 @@ loadTheme();
 renderAuthStatus();
 updateStreak();
 updateBestStreak();
+updateWeekTotal();
 updateSessionList();
 

@@ -2,10 +2,22 @@
 
 Web estática para registrar sesiones de estudio y motivarse viendo la racha de días seguidos. Proyecto didáctico: el código debe poder entenderlo alguien que empieza a programar.
 
+## Trato
+- Llama siempre al usuario por su nombre: **Feirt**. Nada de "usuario" genérico ni otros apodos.
+- El nombre del asistente es **Zeirt**. Los dos están en `../Notas de Agente/jarvis-notas.md`: léelos de
+  ahí, no los inventes ni los cambies por tu cuenta.
+
 ## Stack y estructura
 - HTML, CSS y JavaScript puros: sin frameworks, librerías, npm, bundler ni build.
 - `index.html` (estructura), `styles.css` (estilos), `app.js` (lógica y datos).
 - Debe funcionar abriendo `index.html` con doble clic (`file://`): nada de módulos ES (`type="module"`), `fetch` a archivos locales ni nada que requiera servidor.
+- los comandos o bn elcodgio tene que tener la siguiente estructura para qeu se vea mas prolijo 
+--nombre de la variable 
+{
+    1 + 1
+}
+
+    eso es un ejeplo osea uqe los corche siempre se vean abjo organizados para la sintasis de todo el codiog que hagas.
 
 ## Convenciones
 - Textos de la interfaz en español.
@@ -33,6 +45,8 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - Varias sesiones el mismo día cuentan como un solo día. Las fechas futuras no suman.
 - Mejor racha = longitud máxima de días consecutivos con al menos 1 sesión en cualquier periodo del historial. Se deduplican sesiones del mismo día (cuenta 1 día), se ignoran fechas futuras y no requiere que la corrida termine hoy (puede ser una racha pasada). A diferencia de la racha actual, **no usa el anclaje de hoy/ayer**: son dos cálculos distintos, no los mezcles.
 - Ambas rachas se recalculan siempre desde `diario-estudio-sesiones`; no se guardan en localStorage para evitar que se desincronicen.
+- Los totales de minutos siguen la misma regla: se calculan desde `diario-estudio-sesiones` y no se guardan. La semana va de lunes a hoy y las fechas futuras no suman.
+- Como el formato es `AAAA-MM-DD`, comparar fechas como texto (`>=`, `<=`) es correcto y evita más aritmética con `Date`. Para pasar de un `Date` a texto usa siempre `toLocalDateString()`.
 
 ## Forma de trabajar
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
@@ -54,4 +68,5 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 
 ## Verificación
 - No hay tests ni lint. Probar abriendo `index.html` en el navegador.
+- Total de la semana: registrar una sesión de hoy debe subir el total; una de la semana pasada o de mañana no deben cambiarlo.
 - Para empezar de cero: DevTools → Application → Local Storage → borrar la clave `diario-estudio-sesiones`.
