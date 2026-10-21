@@ -59,7 +59,16 @@
             </form>
 
             <!-- Lista de sesiones -->
-            <h2>Sesiones</h2>
+            <div class="list-head">
+                <h2>Sesiones</h2>
+                <label class="filter-label" for="lista-filtro">Ver:</label>
+                <select id="lista-filtro" class="filter-select">
+                    <option value="hoy" selected>Hoy</option>
+                    <option value="semana">Última semana</option>
+                    <option value="mes">Último mes</option>
+                    <option value="todo">Todo el historial</option>
+                </select>
+            </div>
             <ul id="session-list"></ul>
 
             <!-- Agentes -->
@@ -138,7 +147,18 @@
             </div>
 
             <div class="chart-block">
-                <h3>Reparto por tema</h3>
+                <div class="chart-head">
+                    <h3>Reparto por tema</h3>
+                    <div class="chart-nav">
+                        <label class="filter-label" for="pastel-filtro">Ver:</label>
+                        <select id="pastel-filtro" class="filter-select">
+                            <option value="global" selected>Global</option>
+                            <option value="hoy">Hoy</option>
+                            <option value="dia">Día elegido</option>
+                            <option value="semana">Semana</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="chart-circular" class="chart"></div>
             </div>
 

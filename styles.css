@@ -1339,3 +1339,62 @@ body.dark .chart-detail-minutes
     font-size: 0.9em;
     color: #888;
 }
+
+/* ---------- Filtros: lista de sesiones y gráfico de pastel ---------- */
+
+/* Cabecera de la lista de sesiones: el título a la izquierda y el filtro a la derecha */
+.list-head
+{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.list-head h2
+{
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Etiqueta y desplegable compartidos por los dos filtros */
+.filter-label
+{
+    font-size: 0.9em;
+    color: #555;
+    white-space: nowrap;
+}
+
+.filter-select
+{
+    font: inherit;
+    font-size: 0.9em;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    cursor: pointer;
+    max-width: 100%;
+}
+
+.filter-select:focus
+{
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+}
+
+body.dark .filter-label
+{
+    color: #aab4c8;
+}
+
+body.dark .filter-select
+{
+    background: #1f2430;
+    border-color: #3a4152;
+    color: #e5e7eb;
+}

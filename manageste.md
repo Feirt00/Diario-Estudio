@@ -129,7 +129,7 @@ _(estado en vivo; se actualiza al cerrar cada fase)_
   crea la cuenta **feirt** (contraseña provisional `12345678`, hasheada igual que la app) con **60 días de
   sesiones** repartidas en su clave. Se puede borrar el fichero después.
 
-**Lo que hizo Zeirt como padre en esta fase:**
+**Lo que hizo Zeirt como padre en la fase 4 (los 9 hallazgos H1-H9):**
 - **H1 (`localStorage` sin protección)**: helpers `storageGet()`/`storageSet()`/`storageRemove()` que nunca
   lanzan; los 13 accesos directos del archivo pasan por ellos. Con el almacenamiento bloqueado la app
   **arranca** y el registro/login devuelven un mensaje en vez de reventar.
@@ -180,6 +180,32 @@ arreglo real** y se aceptan como limitación (documentadas en `AGENTS.md`):
    colisión y no se pueden validar sin abrir ese agujero. Se borran al arrancar; **no se pierde nada de
    lo estudiado**, pero hay que crear la cuenta otra vez con el mismo nombre.
 
+### Fase 6 — Filtros de periodo (lista y gráfico de pastel) — **EN CURSO**
+
+Feirt pidió: que la lista "Sesiones" deje de enseñar todo de golpe (que por defecto salga **solo hoy**,
+con un desplegable: última semana / último mes / todo el historial) y que el gráfico de pastel pueda
+mostrar **hoy**, **lo que se estudió en el día elegido** (la barra pulsada en el gráfico de barras),
+**la semana** (lunes a hoy) o **global**.
+
+| Agente | Tarea | Estado |
+|--------|-------|--------|
+| **Zeirt (padre)** | Poner los dos desplegables en `index.html` (`#lista-filtro` y `#pastel-filtro`) y sus estilos (`.list-head`, `.filter-label`, `.filter-select`) | **Hecho** |
+| **Agente 1 — Guardian de los Datos** | Filtro de la lista: estado del filtro, filtrado por rango en `updateSessionList()` y mensaje vacío por rango. **Solo visual**: racha, mejor racha y total de la semana siguen midiéndose con todo el historial | **Terminado**: `listaFiltro` + `getFilterMinDate()` + `filterSessionsForList()` + `getListEmptyMessage()`; su arnés propio dio 17/17 y la batería de Zeirt confirma los 4 rangos con los totales intactos |
+| **Agente 4 — Analista de Datos** | Filtro del pastel: estado del filtro, sesiones por rango en `renderPieChart`/`renderCharts`, repintado al cambiar de opción y al pulsar barra, y aviso si "Día elegido" no tiene día | **Terminado**: `pastelFiltro` + `getPastelSessions()` + `renderPastel()`; el filtrado vive dentro de `renderPieChart()` para que todas las rutas usen el mismo criterio. Su arnés propio dio 21/21 |
+| **Agente 3 — Inspector** | Verificar los dos filtros: totales intactos, nada pintado con `innerHTML`, móvil y teclado, diff de zonas | **Terminado**: veredicto **GO** — 71 comprobaciones, 70 OK, 0 excepciones de consola; diff entero en zonas declaradas. Subió 3 observaciones: H1 (el rango no se guarda al recargar → **decisión de Feirt: se queda como está**, vuelve a "Hoy"), H2 (con cero sesiones y pastel en "Día elegido" se ven dos avisos apilados, cosmético) y H3 (la fecha futura se ve en "Todo el historial": comportamiento previo, no es del filtro) |
+| **Zeirt (padre)** | Verificar los diffs, probar en navegador, documentar y commitear | **Terminado**: diff revisado hunk por hunk, batería v18 en verde (14 comprobaciones, 0 excepciones) |
+
+**Lo que hizo Zeirt como padre en esta fase:**
+- Preparó el terreno antes de delegar: los dos desplegables y sus estilos en `index.html`/`styles.css`,
+  para que los agentes tuvieran dónde engancharse sin pisarse.
+- Revisó el diff de los dos agentes **hunk por hunk**: ambos dentro de su zona; ninguno tocó la del otro.
+- Ejecutó su batería **v18** en Chrome headless (14 comprobaciones): los 4 rangos de lista con los
+  **totales idénticos en todos** (racha 2 / mejor 2 / semana 135), el filtro sobreviviendo al registrar
+  una sesión, el pastel con sus 4 estados (incluido **barra del 11 de octubre pulsada → pastel solo de
+  ese día**), cambio de cuenta sin arrastre de datos, móvil de 390 px y **0 excepciones de consola**.
+- Dos fallos que salieron fueron **de su propia prueba**, no del código (buscaba la barra por un texto
+  equivocado y el cambio de cuenta no probaba el caso real): corrigió la prueba y repitió.
+
 ---
 
 ## 6. Historial de fases
@@ -192,3 +218,4 @@ arreglo real** y se aceptan como limitación (documentadas en `AGENTS.md`):
 | 2026-10-21 | Fase 3 (funcionalidad) | Zeirt (pestañas + cronómetro) y Agente 4 (gráficos en SVG) |
 | 2026-10-21 | Fase 4 (arreglos de los hallazgos) | Zeirt: los 9 hallazgos cerrados y comprobados; commit `v1.6` |
 | 2026-10-21 | Fase 5 (datos por usuario + gráficos navegables) | Agente 1 (sesiones por cuenta) y Agente 4 (ventana de días + detalle), Zeirt verificando e integrando |
+| 2026-10-21 | Fase 6 (filtros de periodo) | Agente 1 (filtro de la lista) y Agente 4 (filtro del pastel) en paralelo, Agente 3 (Inspector) con veredicto **GO** y Zeirt integrando; batería v18 en verde |

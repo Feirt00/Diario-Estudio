@@ -3,7 +3,8 @@
 Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo que ya no aporte.
 
 ## Estado actual
-- v1.7 (fase 5) **cerrada**: **datos por usuario** (sesiones, racha, totales y gráficos ya no se comparten entre cuentas) y **gráficos navegables** (ventana de 7 días movible con `‹`/`›` + detalle de qué se estudió cada día). Para comprobarlo en su navegador, Feirt tiene `crear-cuenta-feirt.html` (cuenta **feirt**, contraseña provisional `12345678`, 60 días de sesiones).
+- v1.8 (fase 6): **filtros de periodo**. La lista "Sesiones" arranca en **Hoy** con desplegable (última semana / último mes / todo el historial) y el gráfico de pastel tiene su desplegable (global / hoy / **día elegido** —el día pulsado en las barras— / semana de lunes a hoy). Ambos filtros son **solo visuales**: racha, mejor racha y total de la semana siguen midiéndose con todo el historial.
+- v1.7 (fase 5): **datos por usuario** (sesiones, racha, totales y gráficos ya no se comparten entre cuentas) y **gráficos navegables** (ventana de 7 días movible con `‹`/`›` + detalle por día). Para comprobarlo en su navegador, Feirt tiene `crear-cuenta-feirt.html` (cuenta **feirt**, contraseña provisional `12345678`, 60 días de sesiones).
 - v1.6: auditoría de seguridad **cerrada** (commit `e4a1208`). Las 27 pruebas y los 9 hallazgos del Inspector (H1-H9) están en `vulnerabilities.md`.
 - Cerradas: B1, B2, B3, B4, B6, C3 (enumeración, sin canal de tiempo), C4/C5 (hash + cuentas antiguas desactivadas), C6, A3, D2, E1 (Escape + foco), E2, E3 y los 9 hallazgos del Inspector.
 - Sigue abierto **por diseño y sin arreglo posible** sin backend: C1/C2 (rate limit reseteable), C7 (la sesión no caduca), C8 (la app no está protegida), B3 residual (suplantar a un usuario que sí existe).
@@ -37,6 +38,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - `hashPassword()`, `registerUser()` y `loginUser()` son async: quien las llama usa `await`. Validaciones y rate limit van DENTRO de esas funciones, no en el evento del formulario.
 - `app.js` tiene finales de línea mezclados (CRLF y LF): no normalizar el archivo entero (diff gigante). Al concatenar o reescribir con PowerShell 5.1 se rompen acentos y emojis: usar el editor de opencode.
 - **El modal de acceso abre SIEMPRE en modo *login***: para registrar por la interfaz hay que pulsar `#auth-toggle-link` ("Crear usuario") antes. Un test que no lo hace registra nada, `loginUser` falla y el resultado parece un bug de datos (se investigó un "duplicado" que era del test).
+- En las baterías de pruebas, **`const R = []` con propiedades con nombre imprime `[]`**: `JSON.stringify` de un array solo serializa los índices. Para recoger resultados con nombre, usar `const R = {}` (le costó una repetición entera a la batería v18).
 
 ## Próximos pasos
 - Falta documentar el bloque de Términos y Condiciones de `index.html`.

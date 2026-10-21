@@ -518,26 +518,111 @@ function createSessionItem(session)
     return item;
 }
 
-// Actualizar lista de sesiones
+// Filtro de la lista "Sesiones": el desplegable vive en index.html y el estado
+// activo en esta variable de módulo. Al pintar NO se lee el DOM para decidir
+// el filtro (solo al arrancar y en el evento change), así que sobrevive a
+// registrar una sesión, al evento storage de otra pestaña y a entrar o salir
+// de una cuenta: todas esas rutas vuelven a llamar a updateSessionList() y
+// aquí seguimos con el mismo filtro.
+const listaFiltroSelect = document.getElementById('lista-filtro');
+let listaFiltro = listaFiltroSelect ? listaFiltroSelect.value : 'hoy';
+
+// Días hacia atrás que cubre cada filtro (hoy siempre incluido en el rango).
+// "Todo el historial" no aparece aquí: no tiene límite.
+const LIST_FILTER_DAYS = {
+    hoy: 0,
+    semana: 6,
+    mes: 29
+};
+
+// Mensaje cuando, con el filtro activo, no hay ninguna sesión que enseñar.
+const LIST_EMPTY_MESSAGES = {
+    hoy: 'Hoy todavía no has registrado sesiones.',
+    semana: 'En los últimos 7 días no hay sesiones registradas.',
+    mes: 'En los últimos 30 días no hay sesiones registradas.',
+    todo: 'Aún no hay sesiones registradas.'
+};
+
+// Fecha mínima (AAAA-MM-DD) que enseña el filtro activo.
+// null = sin límite: todo el historial (y también si el filtro no se
+// reconoce, mejor enseñar de más que esconder datos sin querer).
+// El límite se arma con Date + setDate + toLocalDateString: nunca
+// toISOString() ni new Date("AAAA-MM-DD"), que van a UTC y desplazan el día.
+function getFilterMinDate(filter)
+{
+    const daysBack = LIST_FILTER_DAYS[filter];
+
+    if (typeof daysBack !== 'number')
+    {
+        return null;
+    }
+
+    const date = new Date();
+    date.setDate(date.getDate() - daysBack);
+    return toLocalDateString(date);
+}
+
+// Dejar solo las sesiones dentro del rango del filtro activo.
+// Las fechas ya son texto AAAA-MM-DD, así que compararlas con >= y <= es
+// correcto (misma regla que usan la racha y el total de la semana).
+function filterSessionsForList(sessions, filter)
+{
+    const minDate = getFilterMinDate(filter);
+
+    if (minDate === null)
+    {
+        return sessions;
+    }
+
+    // Las fechas futuras quedan fuera de todos los filtros con límite
+    const today = getTodayLocal();
+    return sessions.filter((session) => session.date >= minDate && session.date <= today);
+}
+
+// Texto del mensaje vacío según el filtro activo (si el filtro no se
+// reconoce, el de "todo el historial").
+function getListEmptyMessage(filter)
+{
+    const message = LIST_EMPTY_MESSAGES[filter];
+    return typeof message === 'string' ? message : LIST_EMPTY_MESSAGES.todo;
+}
+
+// Cambiar el desplegable repinta SOLO la lista. La racha, la mejor racha y el
+// total de la semana no dependen del filtro: se calculan con todo el
+// historial en updateStreak(), updateBestStreak() y updateWeekTotal().
+if (listaFiltroSelect)
+{
+    listaFiltroSelect.addEventListener('change', () =>
+    {
+        listaFiltro = listaFiltroSelect.value;
+        updateSessionList();
+    });
+}
+
+// Actualizar lista de sesiones.
+// El filtro solo cambia lo que se pinta aquí: el orden sigue siendo el mismo
+// (la más reciente primero) y el resto de la app no se entera.
 function updateSessionList()
 {
     const sessions = loadSessions();
 
     sessions.sort((a, b) => b.date.localeCompare(a.date));
 
+    const visibleSessions = filterSessionsForList(sessions, listaFiltro);
+
     // Se vacía la lista y se vuelve a pintar
     sessionList.textContent = '';
 
-    if (sessions.length === 0)
+    if (visibleSessions.length === 0)
     {
         const empty = document.createElement('li');
         empty.className = 'empty-message';
-        empty.textContent = 'Aún no hay sesiones registradas';
+        empty.textContent = getListEmptyMessage(listaFiltro);
         sessionList.appendChild(empty);
         return;
     }
 
-    for (const session of sessions)
+    for (const session of visibleSessions)
     {
         sessionList.appendChild(createSessionItem(session));
     }
@@ -2373,6 +2458,14 @@ function clearChartDays()
     }
 
     updateChartNavButtons();
+
+    // Al cambiar de cuenta se borra el día elegido: si el reparto por tema
+    // mira ese día, hay que enseñar el aviso para no dejar en pantalla los
+    // datos del usuario anterior.
+    if (pastelFiltro === 'dia')
+    {
+        renderPastel();
+    }
 }
 
 // Mover la ventana de días: hacia atrás (días positivos) o hacia delante
@@ -2408,12 +2501,22 @@ function moveChartDays(days)
         }
     }
 
+    let diaElegidoBorrado = false;
+
     if (!sigueVisible)
     {
+        diaElegidoBorrado = chartSelectedDay !== '';
         chartSelectedDay = '';
     }
 
     renderChartDays(sessions);
+
+    // Si la ventana se ha llevado por delante el día elegido, el reparto por
+    // tema deja de tener día que enseñar: solo ese gráfico se actualiza.
+    if (diaElegidoBorrado && pastelFiltro === 'dia')
+    {
+        renderPastel();
+    }
 }
 
 // Pulsar una barra muestra el detalle de ese día.
@@ -2423,6 +2526,13 @@ function toggleChartDay(dayKey)
     chartSelectedDay = (chartSelectedDay === dayKey) ? '' : dayKey;
 
     renderChartDays(getChartSessions());
+
+    // El reparto por tema depende del día elegido: se repinta solo ese
+    // gráfico para no entrar en bucles con el de barras.
+    if (pastelFiltro === 'dia')
+    {
+        renderPastel();
+    }
 
     // Al repintar el gráfico, el foco se pierde: se devuelve a la barra pulsada
     focusChartDay(dayKey);
@@ -2472,11 +2582,129 @@ function describePieSlice(centerX, centerY, radius, startAngle, endAngle)
         + ' Z';
 }
 
+// --- Filtro del reparto por tema ---
+
+// Desplegable "Ver:" de junto al título del gráfico circular
+const pastelFilterSelect = document.getElementById('pastel-filtro');
+
+// Periodo que se reparte en el gráfico circular: el valor del desplegable
+// ("global", "hoy", "dia" o "semana"). Si el valor no se conoce, se comporta
+// como "global", igual que la opción "Global" del desplegado.
+let pastelFiltro = pastelFilterSelect ? pastelFilterSelect.value : 'global';
+
+if (pastelFilterSelect)
+{
+    // Al cambiar el desplegable solo se repinta el gráfico circular:
+    // los demás gráficos no dependen de este filtro.
+    pastelFilterSelect.addEventListener('change', () =>
+    {
+        pastelFiltro = pastelFilterSelect.value;
+        renderPastel();
+    });
+}
+
+// Sesiones que entran en el reparto según el filtro activo.
+// Las fechas son "AAAA-MM-DD" y se comparan como texto, nunca con Date.
+function getPastelSessions(sessions)
+{
+    if (pastelFiltro === 'hoy')
+    {
+        const today = getTodayLocal();
+        return sessions.filter(session => session.date === today);
+    }
+
+    if (pastelFiltro === 'dia')
+    {
+        return sessions.filter(session => session.date === chartSelectedDay);
+    }
+
+    if (pastelFiltro === 'semana')
+    {
+        // Igual que el total de la semana de la app: del lunes a hoy
+        const today = getTodayLocal();
+        const weekStart = toLocalDateString(getMondayOf(parseLocalDate(today)));
+
+        return sessions.filter(session => session.date >= weekStart && session.date <= today);
+    }
+
+    return sessions;
+}
+
+// Periodo que se dibuja, para el tooltip del SVG. Por ejemplo:
+// "Reparto de los minutos estudiados por tema (hoy)"
+function getPastelPeriodText()
+{
+    if (pastelFiltro === 'hoy')
+    {
+        return 'hoy';
+    }
+
+    if (pastelFiltro === 'dia')
+    {
+        if (chartSelectedDay === '')
+        {
+            return 'día elegido';
+        }
+
+        return formatChartDayFullName(parseLocalDate(chartSelectedDay));
+    }
+
+    if (pastelFiltro === 'semana')
+    {
+        return 'esta semana';
+    }
+
+    return 'todo el historial';
+}
+
+// Aviso cuando el filtro activo no tiene minutos que repartir
+function getPastelEmptyMessage()
+{
+    if (pastelFiltro === 'hoy')
+    {
+        return 'Hoy todavía no hay minutos que repartir por temas.';
+    }
+
+    if (pastelFiltro === 'semana')
+    {
+        return 'Esta semana todavía no hay minutos que repartir por temas.';
+    }
+
+    if (pastelFiltro === 'dia')
+    {
+        return 'De ese día todavía no hay minutos que repartir por temas.';
+    }
+
+    return 'Todavía no hay minutos que repartir por temas.';
+}
+
+// Repintar solo el gráfico circular con el filtro activo.
+// Nunca toca el gráfico de barras ni el resto: así no se entra en bucles.
+function renderPastel()
+{
+    const container = document.getElementById('chart-circular');
+
+    if (!container) return;
+
+    renderPieChart(container, getChartSessions());
+}
+
 function renderPieChart(container, sessions)
 {
     container.textContent = '';
 
-    const slices = getTopicSlices(sessions);
+    // Sin día elegido no hay periodo que repartir: se pide que se elija una
+    // barra en vez de enseñar datos de otro momento.
+    if (pastelFiltro === 'dia' && chartSelectedDay === '')
+    {
+        const message = document.createElement('p');
+        message.className = 'empty-message';
+        message.textContent = 'Elige un día en el gráfico de barras para ver su reparto.';
+        container.appendChild(message);
+        return;
+    }
+
+    const slices = getTopicSlices(getPastelSessions(sessions));
 
     let total = 0;
     for (const slice of slices)
@@ -2488,7 +2716,7 @@ function renderPieChart(container, sessions)
     {
         const message = document.createElement('p');
         message.className = 'empty-message';
-        message.textContent = 'Todavía no hay minutos que repartir por temas.';
+        message.textContent = getPastelEmptyMessage();
         container.appendChild(message);
         return;
     }
@@ -2503,7 +2731,7 @@ function renderPieChart(container, sessions)
         'viewBox': '0 0 ' + width + ' ' + height,
         'role': 'img'
     });
-    addSvgTooltip(svg, 'Reparto de los minutos estudiados por tema');
+    addSvgTooltip(svg, 'Reparto de los minutos estudiados por tema (' + getPastelPeriodText() + ')');
 
     let angle = 0;
 

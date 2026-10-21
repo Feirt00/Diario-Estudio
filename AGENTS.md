@@ -49,6 +49,12 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
   pasa en mitad de la app la pantalla se queda en blanco.
 - Una sesión con **0 minutos o negativos se descarta** al cargarla: no es estudiar y no puede contar
   para la racha. Los minutos admiten **un decimal** (12.5) y se redondean a una sola cifra.
+- **La lista "Sesiones" tiene un filtro visual** (`#lista-filtro`: hoy —por defecto—, última semana,
+  último mes o todo el historial). El filtro **solo cambia lo que se pinta** en `updateSessionList()`:
+  racha, mejor racha y total de la semana siguen midiéndose con **todo** el historial. El estado vive
+  en la variable `listaFiltro`, no en el DOM, para que sobreviva a registrar sesión, al evento
+  `storage` y a entrar o salir de cuenta. **Al recargar (F5) vuelve a «Hoy»: es a propósito**, así lo
+  decidió Feirt (el rango elegido no se persiste en `localStorage`).
 
 ## Pestañas, cronómetro y gráficos
 - La app tiene **tres pestañas**: Diario, Cronómetro y Gráficos. Los paneles son `<section class="panel">`
@@ -72,6 +78,11 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
   y minutos de ese día (`renderChartDetail()`); un segundo clic lo cierra. Las variables de la ventana
   son `chartDaysOffset`, `chartSelectedDay` y `chartSessionsKey`; al cambiar de usuario hay que
   llamar a `clearChartDays()`, que es lo que hace `refreshCurrentUserViews()`.
+- **El gráfico de pastel tiene filtro** (`#pastel-filtro`: global —por defecto—, hoy, día elegido o
+  semana). Las sesiones que ve el pastel las decide `getPastelSessions()`; "día elegido" es el día
+  pulsado en el gráfico de barras (`chartSelectedDay`) y, si no hay día, se muestra un aviso en vez de
+  un SVG. `renderPastel()` repinta **solo** el gráfico circular: nunca el de barras, para no entrar en
+  bucles. La lista "Temas más estudiados" no tiene filtro: sigue siendo global.
 
 ## Autenticación (solo local, sin backend)
 - No hay servidor ni base de datos: usuarios y sesión viven en `localStorage`.
