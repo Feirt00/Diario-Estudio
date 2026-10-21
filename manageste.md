@@ -52,26 +52,31 @@ _(estado en vivo; se actualiza al cerrar cada fase)_
 |--------|-------|---------|--------|-----------|
 | **Agente 1 — Guardian de los Datos** | Que la app no se muera con datos corruptos y que no acepte datos imposibles | B1, B2, D2, B4 | Terminado | `try/catch` + `normalizeSession()` al leer; `saveSessions()` devuelve `{ok, message}`; minutos negativos ignorados; mensaje en `#form-message` en vez de `alert()` |
 | **Agente 2 — Criptógrafo del Acceso** | Que la contraseña no se rompa en segundos y que la sesión no se falsifique a la ligera | C3, C4, C5, C6, B3, A3 | Terminado | PBKDF2-SHA256 (210.000 iteraciones) con salt aleatorio + migración de las cuentas viejas; contraseña mínima 8 y lista de comunes; `validateSession()`; cero `innerHTML` |
-| **Agente 3 — Inspector (QA)** | Repasar todo y buscar fallos nuevos | Repetir las 28 + pruebas nuevas | **En curso** | — |
-| **Zeirt (padre)** | Verificar, integrar, documentar y commitear | Diff + 28 pruebas en navegador | Terminado (fase 1) | Aprobado el trabajo de ambos; commit `7f94142` (v1.4) |
+| **Agente 3 — Inspector (QA)** | Repasar todo y buscar fallos nuevos | Repetir las 27 + pruebas nuevas | Terminado (fase 2) | 27 pruebas repetidas + 25 nuevas: salieron 9 hallazgos que nadie había visto (H1-H9) |
+| **Zeirt (padre)** | Verificar, integrar, documentar y commitear | Diff + 27 pruebas en navegador | Terminado (fase 1) | Aprobado el trabajo de ambos; commit `7f94142` (v1.4) |
 
 **Lo que hizo Zeirt como padre en la fase 1:**
 - Leyó el diff de los dos agentes para confirmar que ninguno pisó la zona del otro.
-- Pasó las 28 pruebas en un navegador real: 24 cerradas, 4 abiertas **por diseño** (C1, C2, C7, C8) y B3 a medias.
+- Pasó las 27 pruebas en un navegador real: 24 cerradas, 4 abiertas **por diseño** (C1, C2, C7, C8) y B3 a medias.
 - Arregló lo que los agentes le pasaron: meta CSP (B6), `Escape` cierra el modal (E1), `autocomplete` (E3),
   placeholder "Mínimo 8 caracteres" y el `setTimeout` que cerraba el modal solo.
 - Comprobó que la app sigue funcionando con **doble clic** (`file://`): el JS corre, los estilos cargan y
   `crypto.subtle` está disponible (PBKDF2 funciona al abrir el archivo).
 - Actualizó `AGENTS.md` (reglas permanentes), `MEMORY.md` (estado) y `vulnerabilities.md` (tabla tras los arreglos).
 
-### Fase 2 — Verificación y pruebas nuevas — **EN CURSO**
+### Fase 2 — Verificación y pruebas nuevas — **CERRADA** (fase 2 de la auditoría)
 
 | Agente | Tarea | Estado |
 |--------|-------|--------|
-| **Agente 3 — Inspector (QA)** | Batería completa sobre la app ya arreglada + informe de hallazgos nuevos | En curso (ha montado una librería CDP y un script de re-verificación con las 28 pruebas) |
-| **Zeirt (padre)** | Revisar sus hallazgos, arreglar lo que proceda y cerrar la documentación | Pendiente |
+| **Agente 3 — Inspector (QA)** | Batería completa sobre la app ya arreglada + informe de hallazgos nuevos | **Terminado**: repitió las 27 pruebas, pasó **25 pruebas nuevas** (límites de usuario y contraseña, Unicode, 5.000 sesiones, dos pestañas, cronómetro, gráficos, CSP, `localStorage` bloqueado) y encontró **9 problemas que las 27 pruebas anteriores no veían** (H1-H9). No modificó ningún archivo del proyecto |
+| **Zeirt (padre)** | Revisar sus hallazgos, arreglar lo que proceda y cerrar la documentación | **Terminado** (ver fase 4) |
 
-### Fase 3 — Pestañas, cronómetro y gráficos — **EN CURSO**
+**Lo que hizo Zeirt como padre en esta fase:**
+- Leyó el informe del Inspector y **verificó cada hallazgo en el código** antes de tocar nada: los 9 eran
+  reales (no eran falsos positivos).
+- Aplicó los arreglos (fase 4) y los comprobó uno por uno en un navegador real, con su propia batería.
+
+### Fase 3 — Pestañas, cronómetro y gráficos — **CERRADA**
 
 | Agente | Tarea | Estado |
 |--------|-------|--------|
@@ -89,6 +94,32 @@ _(estado en vivo; se actualiza al cerrar cada fase)_
 - El cronómetro **registra la sesión en el diario** al terminar: reutiliza `loadSessions()`/`saveSessions()`
   en vez de duplicar la lógica del formulario.
 - El sonido es con la **Web Audio API** (sin archivos de sonido y sin descargas).
+
+### Fase 4 — Arreglos de los hallazgos del Inspector — **CERRADA** (fase 3 de la auditoría)
+
+| Agente | Tarea | Estado |
+|--------|-------|--------|
+| **Zeirt (padre)** | Arreglar los 9 hallazgos (H1-H9) y corregir la documentación que mentía | **Terminado**: los 9 comprobados uno por uno en el navegador, 0 excepciones de consola |
+
+**Lo que hizo Zeirt como padre en esta fase:**
+- **H1 (`localStorage` sin protección)**: helpers `storageGet()`/`storageSet()`/`storageRemove()` que nunca
+  lanzan; los 13 accesos directos del archivo pasan por ellos. Con el almacenamiento bloqueado la app
+  **arranca** y el registro/login devuelven un mensaje en vez de reventar.
+- **H2 (canal de tiempo)**: cuando el usuario no existe se calcula un hash "de mentira" con el mismo
+  coste. Antes: 0 ms frente a 30 ms (×2990). Ahora: **36 ms frente a 39 ms (×1,08)**.
+- **H3 (el registro revelaba los nombres que existían)**: un único mensaje (`REGISTER_MESSAGE`) y un flujo
+  que **siempre** acaba pidiendo iniciar sesión (sin iniciar sesión solo). Alta, nombre repetido y nombre
+  libre → el mismo texto y el mismo comportamiento.
+- **H4 (las cuentas antiguas seguían abriéndose)**: `purgeLegacyUsers()` las borra al arrancar y el login
+  no las valida. Se pierde el acceso a esas cuentas, **no lo estudiado**: las sesiones no viven en la cuenta.
+- **H5 (0 o negativos contaban como día de racha)**: `normalizeSession()` los descarta.
+- **H6 (dos pestañas no se sincronizaban)**: la app escucha el evento `storage`.
+- **H7 (el foco se perdía al cerrar el modal)**: `#login-link` y `#logout-link` son `<button>`.
+- **H8 (el modal no tenía trampa de foco)**: `Tab` y `Shift+Tab` no salen del modal.
+- **H9 (los minutos se truncaban)**: los minutos admiten un decimal, igual en el formulario y en el cronómetro.
+- **H10**: el informe decía "28 pruebas" y había 27: corregido en los dos archivos.
+- Documentó todo en `vulnerabilities.md` (sección "Fase 3: hallazgos nuevos y cómo se han cerrado") y fijó
+  las reglas permanentes en `AGENTS.md` (almacenamiento a salvo de fallos, enumeración, cuentas antiguas).
 
 ---
 
@@ -117,6 +148,9 @@ arreglo real** y se aceptan como limitación (documentadas en `AGENTS.md`):
    **existente** sigue siendo posible (prueba **B3**).
 3. La contraseña se guarda hasheada, pero quien tenga el navegador puede leer el hash. Con PBKDF2 y
    salt aleatorio ya no se rompe con un diccionario trivial (pruebas **C4** y **C5**).
+4. Las cuentas anteriores a PBKDF2 (hash FNV-1a de 32 bits) están **desactivadas**: se rompían por
+   colisión y no se pueden validar sin abrir ese agujero. Se borran al arrancar; **no se pierde nada de
+   lo estudiado**, pero hay que crear la cuenta otra vez con el mismo nombre.
 
 ---
 
@@ -124,5 +158,8 @@ arreglo real** y se aceptan como limitación (documentadas en `AGENTS.md`):
 
 | Fecha | Fase | Resultado |
 |-------|------|-----------|
-| 2026-10-21 | Auditoría de seguridad | 28 pruebas en `vulnerabilities.md`: el XSS aguanta; fallan datos y autenticación |
+| 2026-10-21 | Auditoría de seguridad | 27 pruebas en `vulnerabilities.md`: el XSS aguanta; fallan datos y autenticación |
 | 2026-10-21 | Fase 1 (arreglos) | Agente 1 + Agente 2 en paralelo, Zeirt como verificador |
+| 2026-10-21 | Fase 2 (verificación) | Agente 3 (Inspector): 27 pruebas repetidas + 25 nuevas → 9 hallazgos nuevos (H1-H9) |
+| 2026-10-21 | Fase 3 (funcionalidad) | Zeirt (pestañas + cronómetro) y Agente 4 (gráficos en SVG) |
+| 2026-10-21 | Fase 4 (arreglos de los hallazgos) | Zeirt: los 9 hallazgos cerrados y comprobados; commit `v1.6` |

@@ -34,6 +34,11 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
   `loadSessions()` nunca lanza. Si añades un dato nuevo, valídalo con el mismo patrón.
 - Los errores al leer o guardar se avisan **en la interfaz**, nunca con `alert()` ni solo por consola:
   `saveSessions()` devuelve `{ ok, message }` y el mensaje se pinta en `#form-message`.
+- **Nunca llames a `localStorage` directamente**: usa `storageGet()`, `storageSet()` y `storageRemove()`.
+  `localStorage` puede lanzar sin avisar (cookies desactivadas, modo privado, cuota llena) y si eso
+  pasa en mitad de la app la pantalla se queda en blanco.
+- Una sesión con **0 minutos o negativos se descarta** al cargarla: no es estudiar y no puede contar
+  para la racha. Los minutos admiten **un decimal** (12.5) y se redondean a una sola cifra.
 
 ## Pestañas, cronómetro y gráficos
 - La app tiene **tres pestañas**: Diario, Cronómetro y Gráficos. Los paneles son `<section class="panel">`
@@ -56,11 +61,20 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - Claves: `diario-estudio-usuarios` (array de `{ username, usernameKey, passwordHash, salt, createdAt }`), `diario-estudio-sesion` (sesión activa) y `diario-estudio-login-intentos` (rate limit).
 - Las contraseñas se guardan hasheadas, nunca en claro. El hash es **PBKDF2-HMAC-SHA256** con 210.000 iteraciones y **salt aleatorio por usuario** (campo `salt`), vía Web Crypto API. Si `crypto.subtle` no está disponible, se avisa y **no** se cae a un hash débil.
 - `hashPassword()`, `registerUser()` y `loginUser()` son **asíncronas**: quien las llama usa `await`.
-- Las cuentas anteriores a PBKDF2 (sin `salt`) siguen entrando: se validan con `hashPasswordLegacy()` y
-  se re-hashean solas en el primer login correcto. No borres `hashPasswordLegacy()` sin un plan de migración.
+- Las cuentas anteriores a PBKDF2 (sin `salt`) están **desactivadas**: su hash era FNV-1a de 32 bits,
+  que se rompe por colisión, así que no se pueden validar sin abrir ese agujero. `purgeLegacyUsers()`
+  las borra al arrancar. **No se pierde nada de lo estudiado**: las sesiones viven en
+  `diario-estudio-sesiones`, no en la cuenta; solo hay que crear la cuenta otra vez.
 - Contraseñas: mínimo 8 caracteres, máximo 128 y lista de contraseñas comunes rechazadas.
 - `usernameKey` es el nombre en minúsculas y sin espacios: dos usuarios que solo se diferencian en mayúsculas o espacios son el mismo.
 - Login fallido devuelve siempre el mismo mensaje genérico para no revelar qué usuarios existen.
+- **El registro tampoco puede revelar nada**: el mensaje (`REGISTER_MESSAGE`) es el mismo si el nombre
+  está libre o si ya existe, y el flujo **siempre** acaba pidiendo iniciar sesión. Si el mensaje o el
+  comportamiento cambian según exista el nombre, se puede enumerar la lista de usuarios.
+- **Ni el tiempo puede delatarlo**: cuando el usuario no existe se calcula un hash "de mentira" con
+  el mismo coste, para que el login tarde lo mismo en los dos casos (canal de tiempo).
+- La app escucha el evento `storage`: si otra pestaña del navegador guarda sesiones, esta actualiza
+  sola la lista y los totales.
 - Rate limit local: 5 intentos fallidos → 30 s de bloqueo en el que **ni un login correcto entra**. El bloqueo vive en `loginUser()`, no en el evento del formulario; se resetea al iniciar sesión.
 - La sesión se valida al arrancar (`validateSession()`): si el usuario no existe o el formato es raro, se borra y se sigue sin sesión.
 - La app **no** está protegida: se puede usar sin iniciar sesión. El login solo identifica al usuario.
@@ -88,7 +102,7 @@ No las maquilles con seguridad falsa: documéntalas y ya está.
 
 ## Equipo de agentes
 - El proyecto se trabaja con un equipo de agentes: **Zeirt** (agente principal, el padre) delega, revisa y
-  entrega; los agentes 1-3 tienen zonas de código reservadas y no tocan la de los demás.
+  entrega; los agentes 1-4 tienen zonas de código reservadas y no tocan la de los demás.
 - El reparto, el protocolo de delegación y el estado de cada uno están en **`manageste.md`**: léelo antes de
   tocar nada y actualiza el estado al terminar tu parte.
 - Regla de oro: si necesitas tocar la zona de otro agente, **no lo hagas**: anótalo en tu informe y lo decide Zeirt.

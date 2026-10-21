@@ -93,11 +93,24 @@ body.dark .auth-status
     cursor: pointer;
     font-weight: 500;
     text-decoration: none;
+    /* Es un <button> (para que se pueda enfocar con el teclado): se quitan
+       los estilos que el navegador pone por defecto */
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
 }
 
 .auth-link:hover
 {
     text-decoration: underline;
+}
+
+.auth-link:focus-visible
+{
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
 }
 
 .auth-username

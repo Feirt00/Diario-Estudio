@@ -55,10 +55,6 @@ const PBKDF2_HASH = 'SHA-256';
 const PBKDF2_KEY_BITS = 256;
 const SALT_BYTES = 16;
 
-// Salt del hash antiguo (FNV-1a). Solo lo usa hashPasswordLegacy() para poder
-// validar las cuentas creadas antes de que existiera PBKDF2.
-const LEGACY_SALT = 'diario-estudio-v1';
-
 // Contraseñas muy comunes: se rechazan al crear una cuenta.
 const COMMON_PASSWORDS = [
     '123456',
@@ -77,6 +73,67 @@ const COMMON_PASSWORDS = [
     'iloveyou',
     'letmein'
 ];
+
+// ============================================================
+// Almacenamiento (localStorage) a salvo de fallos
+// ============================================================
+//
+// localStorage puede lanzar errores sin avisar: el navegador puede bloquearlo
+// (cookies desactivadas, modo privado estricto) o no tener espacio. Si eso pasa
+// en mitad de la app, la pantalla se queda en blanco. Estos tres helpers
+// capturan el error y devuelven null/false, para que la app siga viva.
+
+// Último error que ha dado el almacenamiento. Sirve para saber si lo que falló
+// fue la cuota (no hay espacio) o cualquier otra cosa.
+let storageLastError = null;
+
+function storageGet(key)
+{
+    try
+    {
+        return localStorage.getItem(key);
+    }
+    catch (error)
+    {
+        storageLastError = error;
+        console.warn('No se pudo leer "' + key + '" del almacenamiento:', error);
+        return null;
+    }
+}
+
+function storageSet(key, value)
+{
+    try
+    {
+        localStorage.setItem(key, value);
+        return true;
+    }
+    catch (error)
+    {
+        storageLastError = error;
+        console.warn('No se pudo guardar "' + key + '" en el almacenamiento:', error);
+        return false;
+    }
+}
+
+function storageRemove(key)
+{
+    try
+    {
+        localStorage.removeItem(key);
+        return true;
+    }
+    catch (error)
+    {
+        storageLastError = error;
+        console.warn('No se pudo borrar "' + key + '" del almacenamiento:', error);
+        return false;
+    }
+}
+
+// Mensaje del registro. Es el MISMO si la cuenta se crea o si el nombre ya
+// estaba en uso: así el registro no sirve para averiguar qué usuarios existen.
+const REGISTER_MESSAGE = 'Si ese nombre estaba libre, la cuenta ya está creada. Inicia sesión para entrar.';
 
 // Obtener fecha de hoy en formato local (YYYY-MM-DD)
 function getTodayLocal()
@@ -146,6 +203,11 @@ function normalizeSession(session)
     const minutes = Number(session.minutes);
     if (!isFinite(minutes)) return null;
 
+    // Una sesión de 0 minutos (o negativos) no es estudiar: se descarta, igual
+    // que hace el formulario, que no deja guardar minutos <= 0. Si se dejaran
+    // pasar, la racha contaría días que no se han estudiado (prueba H5).
+    if (minutes <= 0) return null;
+
     return { date: session.date, topic: session.topic, minutes: minutes };
 }
 
@@ -158,7 +220,7 @@ function loadSessions()
 
     try
     {
-        const data = localStorage.getItem(STORAGE_KEY);
+        const data = storageGet(STORAGE_KEY);
         parsed = data ? JSON.parse(data) : [];
     }
     catch (error)
@@ -195,22 +257,17 @@ function loadSessions()
 // la escritura (cuota llena, almacenamiento bloqueado) se avisa con un mensaje.
 function saveSessions(sessions)
 {
-    try
+    if (!storageSet(STORAGE_KEY, JSON.stringify(sessions)))
     {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-        return { ok: true, message: '' };
-    }
-    catch (error)
-    {
-        console.warn('No se pudieron guardar las sesiones:', error);
-
-        const isQuotaExceeded = error && error.name === 'QuotaExceededError';
+        const isQuotaExceeded = storageLastError && storageLastError.name === 'QuotaExceededError';
         const message = isQuotaExceeded
             ? 'No se pudo guardar la sesión: el almacenamiento del navegador está lleno. Borra sesiones antiguas o libera espacio.'
-            : 'No se pudo guardar la sesión en este navegador.';
+            : 'No se pudo guardar la sesión en este navegador: el almacenamiento está bloqueado o lleno.';
 
         return { ok: false, message: message };
     }
+
+    return { ok: true, message: '' };
 }
 
 // Calcular racha actual
@@ -365,7 +422,7 @@ function updateWeekTotal()
 function formatMinutes(minutes)
 {
     const value = Number(minutes);
-    if (!isFinite(value)) return '0 min';
+    if (!isFinite(value) || value <= 0) return '0 min';
     return value + ' min';
 }
 
@@ -422,10 +479,10 @@ function updateSessionList()
 // Los agentes del proyecto: quién es y qué está haciendo.
 // El reparto detallado y el protocolo de delegación están en `manageste.md`.
 const AGENTS = [
-    { name: 'Zeirt', role: 'Agente principal', task: 'Verifica, integra y documenta', status: 'trabajando' },
+    { name: 'Zeirt', role: 'Agente principal', task: 'Verifica, integra y documenta', status: 'terminado' },
     { name: 'Guardian de los Datos', role: 'Agente 1', task: 'Robustez de datos y validaciones', status: 'terminado' },
     { name: 'Criptógrafo del Acceso', role: 'Agente 2', task: 'Hash, contraseñas y sesión', status: 'terminado' },
-    { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'trabajando' },
+    { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'terminado' },
     { name: 'Analista de Datos', role: 'Agente 4', task: 'Gráficos de estudio en SVG', status: 'terminado' }
 ];
 
@@ -489,9 +546,12 @@ form.addEventListener('submit', (e) =>
 
     const date = dateInput.value;
     const topic = topicInput.value.trim();
-    const minutes = parseInt(minutesInput.value);
 
-    if (!isValidDateString(date) || !topic || !minutes || minutes <= 0)
+    // Los minutos admiten un decimal: se redondea a una sola cifra para no
+    // guardar valores larguísimos (12.34 -> 12.3).
+    const minutes = Math.round(Number(minutesInput.value) * 10) / 10;
+
+    if (!isValidDateString(date) || !topic || !isFinite(minutes) || minutes <= 0)
     {
         showFormMessage('Por favor, completa todos los campos correctamente.', 'error');
         return;
@@ -526,13 +586,13 @@ function toggleTheme()
     document.body.classList.toggle('dark');
     const isDark = document.body.classList.contains('dark');
     themeToggle.textContent = isDark ? '☀️' : '🌙';
-    localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+    storageSet(THEME_KEY, isDark ? 'dark' : 'light');
 }
 
 // Cargar tema guardado
 function loadTheme()
 {
-    const savedTheme = localStorage.getItem(THEME_KEY);
+    const savedTheme = storageGet(THEME_KEY);
     if (savedTheme === 'dark')
     {
         document.body.classList.add('dark');
@@ -631,22 +691,6 @@ async function hashPassword(password, salt)
     }
 }
 
-// Hash ANTIGUO (FNV-1a de 32 bits con salt fijo). No es criptografía: solo evita
-// que la contraseña se lea en claro. Se conserva únicamente para migrar las
-// cuentas ya guardadas: si un usuario no tiene "salt" se compara con este hash
-// y, si la contraseña es correcta, se re-hashea con PBKDF2.
-function hashPasswordLegacy(usernameKeyValue, password)
-{
-    const text = LEGACY_SALT + usernameKeyValue + password;
-    let hash = 2166136261;
-    for (let i = 0; i < text.length; i++)
-    {
-        hash ^= text.charCodeAt(i);
-        hash = (hash * 16777619) >>> 0;
-    }
-    return hash.toString(16);
-}
-
 // Comparar dos hashes sin devolver en cuanto un carácter no coincide
 function hashesMatch(hashA, hashB)
 {
@@ -671,7 +715,7 @@ function isCommonPassword(password)
 // vacía en vez de romper la app.
 function loadUsers()
 {
-    const data = localStorage.getItem(USERS_KEY);
+    const data = storageGet(USERS_KEY);
     if (!data) return [];
 
     try
@@ -695,13 +739,39 @@ function loadUsers()
 
 function saveUsers(users)
 {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    return storageSet(USERS_KEY, JSON.stringify(users));
+}
+
+// Quitar las cuentas antiguas (las que no tienen "salt").
+//
+// MOTIVO: antes de PBKDF2 la contraseña se guardaba con un hash FNV-1a de solo
+// 32 bits. Con tan pocos bits hay colisiones (dos contraseñas distintas con el
+// mismo hash) y se pueden encontrar en segundos, así que esas cuentas NO se
+// pueden validar sin abrir ese agujero (prueba C4).
+//
+// Qué se pierde: el acceso a esas cuentas (no sus datos). Las sesiones de
+// estudio no están en la cuenta, viven en "diario-estudio-sesiones", así que no
+// se pierde nada de lo que el usuario haya estudiado. El nombre queda libre para
+// volver a crear la cuenta.
+function purgeLegacyUsers()
+{
+    const users = loadUsers();
+    const current = users.filter(user => typeof user.salt === 'string' && user.salt !== '');
+    const removed = users.length - current.length;
+
+    if (removed > 0)
+    {
+        saveUsers(current);
+        console.warn('Se han desactivado ' + removed + ' cuenta(s) antigua(s) por seguridad.');
+    }
+
+    return removed;
 }
 
 // Leer la sesión guardada. Devuelve null si no hay o si el JSON está roto.
 function getCurrentUser()
 {
-    const data = localStorage.getItem(SESSION_KEY);
+    const data = storageGet(SESSION_KEY);
     if (!data) return null;
 
     try
@@ -753,7 +823,7 @@ function validateSession()
 
 function setSession(username)
 {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
+    return storageSet(SESSION_KEY, JSON.stringify({
         username: username,
         loggedInAt: getTodayLocal()
     }));
@@ -761,7 +831,7 @@ function setSession(username)
 
 function clearSession()
 {
-    localStorage.removeItem(SESSION_KEY);
+    storageRemove(SESSION_KEY);
 }
 
 // Intentos fallidos de acceso
@@ -772,7 +842,7 @@ function clearSession()
 // de arreglarlo de verdad, así que esto frena la impaciencia, no la fuerza bruta.
 function loadAttempts()
 {
-    const data = localStorage.getItem(ATTEMPTS_KEY);
+    const data = storageGet(ATTEMPTS_KEY);
     if (!data) return { count: 0, blockedUntil: 0 };
 
     try
@@ -793,7 +863,7 @@ function loadAttempts()
 
 function saveAttempts(attempts)
 {
-    localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
+    storageSet(ATTEMPTS_KEY, JSON.stringify(attempts));
 }
 
 // Segundos que quedan de bloqueo (0 si no está bloqueado)
@@ -834,7 +904,10 @@ function renderAuthStatus()
         name.className = 'auth-username';
         name.textContent = user.username;
 
-        const exit = document.createElement('span');
+        // Son <button> y no <span> para que se puedan enfocar con el teclado
+        // y el foco vuelva aquí al cerrar el modal.
+        const exit = document.createElement('button');
+        exit.type = 'button';
         exit.className = 'auth-link';
         exit.id = 'logout-link';
         exit.textContent = 'Cerrar sesión';
@@ -844,7 +917,8 @@ function renderAuthStatus()
     }
     else
     {
-        const login = document.createElement('span');
+        const login = document.createElement('button');
+        login.type = 'button';
         login.className = 'auth-link';
         login.id = 'login-link';
         login.textContent = 'Iniciar sesión';
@@ -871,11 +945,19 @@ function setAuthMessage(text, type)
     authMessage.className = 'auth-message ' + type;
 }
 
-function setAuthMode(mode)
+// Cambiar el modo del modal ("login" o "register").
+// keepValues: si es true no se borra lo que el usuario escribió. Se usa al
+// terminar un registro, para que solo tenga que pulsar "Entrar".
+function setAuthMode(mode, keepValues)
 {
     authMode = mode;
     setAuthMessage('');
-    clearAuthForm();
+
+    if (!keepValues)
+    {
+        clearAuthForm();
+    }
+
     updateRateLimitUI();
 
     if (mode === 'login')
@@ -967,6 +1049,21 @@ function closeAuthModal()
 // Devuelve { ok, message }. Nunca lanza errores: siempre un mensaje para el usuario.
 async function registerUser(username, password)
 {
+    try
+    {
+        return await createAccount(username, password);
+    }
+    catch (error)
+    {
+        console.warn('No se pudo completar el registro:', error);
+        return { ok: false, message: 'No se ha podido guardar la cuenta en este navegador. Borra datos del navegador o libera espacio.' };
+    }
+}
+
+// Crear la cuenta. Va separada de registerUser() para que registerUser() sea
+// siempre la que envuelve los errores: nunca se lanzan hacia la interfaz.
+async function createAccount(username, password)
+{
     if (!username || !password)
     {
         return { ok: false, message: 'Completa ambos campos.' };
@@ -1001,12 +1098,12 @@ async function registerUser(username, password)
     const users = loadUsers();
     const key = usernameKey(username);
 
-    // El mensaje NO confirma si el usuario ya existe (evita enumerar cuentas).
-    // COMPROMISO CON LA USABILIDAD: quien intenta crear una cuenta con un nombre
-    // que ya existe no recibe un aviso claro, solo que pruebe con otro o inicie sesión.
+    // Si el nombre ya está en uso se responde con el MISMO mensaje y el mismo
+    // comportamiento que si la cuenta se acabara de crear. Si no, el registro
+    // serviría para averiguar qué nombres de usuario existen (prueba C3).
     if (users.some(user => user.usernameKey === key))
     {
-        return { ok: false, message: 'No se ha podido crear la cuenta con ese nombre. Prueba con otro o inicia sesión.' };
+        return { ok: true, message: REGISTER_MESSAGE };
     }
 
     const salt = generateSalt();
@@ -1024,13 +1121,34 @@ async function registerUser(username, password)
         salt: salt,
         createdAt: getTodayLocal()
     });
-    saveUsers(users);
-    setSession(username);
-    return { ok: true, message: '¡Cuenta creada! Bienvenido, ' + username + '.' };
+
+    if (!saveUsers(users))
+    {
+        return { ok: false, message: 'No se ha podido guardar la cuenta: el almacenamiento del navegador está lleno. Borra datos del navegador o libera espacio.' };
+    }
+
+    // No se inicia sesión aquí a propósito: el registro siempre acaba igual
+    // (pide iniciar sesión), así que no revela si el nombre estaba libre.
+    return { ok: true, message: REGISTER_MESSAGE };
 }
 
 // Devuelve { ok, message }. Nunca lanza errores: siempre un mensaje para el usuario.
 async function loginUser(username, password)
+{
+    try
+    {
+        return await signIn(username, password);
+    }
+    catch (error)
+    {
+        console.warn('No se pudo completar el inicio de sesión:', error);
+        return { ok: false, message: 'No se ha podido comprobar la contraseña en este navegador. Inténtalo de nuevo.' };
+    }
+}
+
+// Comprobar la contraseña e iniciar sesión. Va separada de loginUser() para que
+// loginUser() sea siempre la que envuelve los errores.
+async function signIn(username, password)
 {
     // Bloqueo por intentos: no se comprueba nada mientras dure
     const left = secondsLeftBlocked();
@@ -1059,38 +1177,25 @@ async function loginUser(username, password)
 
     if (!user)
     {
+        // Se calcula un hash "de mentira" para que este fallo tarde lo mismo que
+        // un login real. Si no, el tiempo de respuesta revelaría qué usuarios
+        // existen (canal de tiempo, prueba H2).
+        await hashPassword(password, generateSalt());
         registerFailedAttempt();
         return fail;
     }
 
     const salt = typeof user.salt === 'string' ? user.salt : '';
 
-    // Cuenta antigua (hash FNV-1a, sin salt): se valida con el hash viejo y, si la
-    // contraseña es correcta, se re-hashea con PBKDF2 y se guarda el salt nuevo.
-    // Así las cuentas ya creadas siguen entrando (migración silenciosa).
+    // Las cuentas creadas antes de PBKDF2 (sin "salt") están desactivadas: su
+    // contraseña se guardaba con un hash de 32 bits (FNV-1a) que se rompe por
+    // colisión (prueba C4). No se pueden validar sin abrir ese agujero, así que
+    // se ignoran. Sus sesiones de estudio no se pierden: el nombre queda libre
+    // para crear la cuenta otra vez.
     if (salt === '')
     {
-        if (!hashesMatch(user.passwordHash, hashPasswordLegacy(key, password)))
-        {
-            registerFailedAttempt();
-            return fail;
-        }
-
-        const newSalt = generateSalt();
-        const newHash = await hashPassword(password, newSalt);
-
-        if (!newHash)
-        {
-            return { ok: false, message: 'No se ha podido comprobar la contraseña en este navegador. Inténtalo de nuevo.' };
-        }
-
-        user.salt = newSalt;
-        user.passwordHash = newHash;
-        saveUsers(users);
-
-        clearAttempts();
-        setSession(user.username);
-        return { ok: true, message: 'Sesión iniciada.' };
+        registerFailedAttempt();
+        return fail;
     }
 
     const hash = await hashPassword(password, salt);
@@ -1101,8 +1206,14 @@ async function loginUser(username, password)
         return fail;
     }
 
+    // Si la sesión no se puede guardar, avisamos: si no, el login parecería
+    // bueno pero el usuario seguiría sin sesión al recargar.
+    if (!setSession(user.username))
+    {
+        return { ok: false, message: 'No se ha podido guardar la sesión en este navegador. Borra datos del navegador o libera espacio.' };
+    }
+
     clearAttempts();
-    setSession(user.username);
     return { ok: true, message: 'Sesión iniciada.' };
 }
 
@@ -1153,6 +1264,24 @@ authForm.addEventListener('submit', async (e) =>
         ? await registerUser(authUsername.value.trim(), authPassword.value)
         : await loginUser(authUsername.value.trim(), authPassword.value);
 
+    // El registro SIEMPRE termina pidiendo iniciar sesión, diga lo que diga el
+    // resultado. Así no se puede averiguar si el nombre ya estaba en uso
+    // (prueba C3): el comportamiento es idéntico en los dos casos.
+    if (authMode === 'register')
+    {
+        if (result.ok)
+        {
+            setAuthMode('login', true);
+            setAuthMessage(result.message, 'success');
+        }
+        else
+        {
+            authSubmit.disabled = false;
+            setAuthMessage(result.message, 'error');
+        }
+        return;
+    }
+
     if (result.ok)
     {
         setAuthMessage(result.message, 'success');
@@ -1166,12 +1295,37 @@ authForm.addEventListener('submit', async (e) =>
     }
 });
 
-// La tecla Escape cierra el modal de acceso
+// Teclado dentro del modal de acceso:
+// - Escape cierra el modal.
+// - Tab no deja salir del modal (trampa de foco): al llegar al último elemento
+//   el foco vuelve al primero, y al revés con Shift.
 document.addEventListener('keydown', (e) =>
 {
-    if (e.key === 'Escape' && !authModal.hidden)
+    if (authModal.hidden) return;
+
+    if (e.key === 'Escape')
     {
         closeAuthModal();
+        return;
+    }
+
+    if (e.key !== 'Tab') return;
+
+    const focusables = authModal.querySelectorAll('button, input, a[href], [tabindex]:not([tabindex="-1"])');
+    if (focusables.length === 0) return;
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    if (e.shiftKey && document.activeElement === first)
+    {
+        e.preventDefault();
+        last.focus();
+    }
+    else if (!e.shiftKey && document.activeElement === last)
+    {
+        e.preventDefault();
+        first.focus();
     }
 });
 
@@ -1272,13 +1426,10 @@ function saveTimerState()
         minutes: timerMinutes.value
     };
 
-    try
+    // Si el navegador no deja guardar, el cronómetro sigue funcionando en memoria
+    if (!storageSet(TIMER_KEY, JSON.stringify(state)))
     {
-        localStorage.setItem(TIMER_KEY, JSON.stringify(state));
-    }
-    catch (e)
-    {
-        // Si el navegador no deja guardar, el cronómetro sigue funcionando en memoria
+        console.warn('No se pudo guardar el estado del cronómetro.');
     }
 }
 
@@ -1287,7 +1438,7 @@ function loadTimerState()
 {
     try
     {
-        const data = localStorage.getItem(TIMER_KEY);
+        const data = storageGet(TIMER_KEY);
         if (!data) return null;
         return JSON.parse(data);
     }
@@ -1428,7 +1579,7 @@ function showTimerDone()
 function saveTimerSession()
 {
     const elapsed = Math.max(0, timerTotalSeconds - timerRemaining);
-    const minutes = Math.max(1, Math.round(elapsed / 60));
+    const minutes = Math.max(0.1, Math.round((elapsed / 60) * 10) / 10);
     const topic = timerTopic.value.trim() || 'Sesión de cronómetro';
 
     const sessions = loadSessions();
@@ -2250,9 +2401,24 @@ function renderCharts()
     renderTopTopics(topList, sessions);
 }
 
+// Cuando otra pestaña del navegador guarda sesiones, esta se actualiza.
+// Sin esto las dos pestañas del mismo diario muestran datos distintos.
+window.addEventListener('storage', (e) =>
+{
+    if (e.key === STORAGE_KEY)
+    {
+        updateStreak();
+        updateBestStreak();
+        updateWeekTotal();
+        updateSessionList();
+    }
+});
+
 // Inicializar
 dateInput.value = getTodayLocal();
 loadTheme();
+// Las cuentas antiguas (con el hash débil) se desactivan antes de validar la sesión
+purgeLegacyUsers();
 // Si la sesión guardada no es válida (usuario inexistente o formato raro), se borra
 validateSession();
 renderAuthStatus();

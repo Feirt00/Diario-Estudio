@@ -6,19 +6,26 @@ Auditoría de seguridad de la app local (`index.html` + `app.js` + `styles.css`)
 - **Alcance:** todo lo que se ejecuta en el navegador. La app es 100 % local: sin backend, sin red,
   sin base de datos. El "atacante" es alguien con acceso al navegador (la misma persona que usa la
   app, o alguien que le abre el equipo un momento).
-- **Método:** revisión del código + 28 pruebas ejecutadas de verdad en el navegador, simulando a un
-  atacante haciendo cosas desde la consola (DevTools).
+- **Método:** revisión del código + 27 pruebas ejecutadas de verdad en el navegador, simulando a un
+  atacante haciendo cosas desde la consola (DevTools). (Al principio seolehía "28": son 27 ids
+  únicos, A1-A5=5, B1-B6=6, C1-C8=8, D1-D5=5, E1-E3=3. El recuento se corrigió en la fase 3.)
 - **Cómo se probó:** la app servida en `http://localhost:8123` (mismo código que con doble clic) y
   ataque con `localStorage`, inyecciones de payloads y llamadas directas a las funciones internas.
   No se modificó ningún archivo del proyecto.
 - **Escala:** `Alta` / `Media` / `Baja` / `Info`. Casi todo cae en `Media` o `Baja` porque el daño
   se limita a este navegador. Lo marcado `Info` o "por diseño" son cosas que `AGENTS.md` ya declara
   como aceptadas.
+- **Fases de la auditoría (las de este archivo):** fase 1 = el informe inicial, fase 2 = los arreglos de
+  los agentes 1 y 2, fase 3 = los hallazgos del Inspector y sus arreglos. Las fases *del equipo* están en
+  `manageste.md` (allí la fase 3 es la de las pestañas y los gráficos).
 - **Nada de esto se ha arreglado todavía.** Este archivo es el informe; los arreglos van en tareas
   aparte.
-- **Actualización 2026-10-21 (fase 2):** los arreglos ya están aplicados y las 28 pruebas se repitieron
+- **Actualización 2026-10-21 (fase 2):** los arreglos ya están aplicados y las 27 pruebas se repitieron
   sobre la app nueva. Ver la sección **"Estado tras los arreglos"**, más abajo. Este informe conserva
   la foto del estado original.
+- **Actualización 2026-10-21 (fase 3):** el Inspector (Agente 3) repitió las 27 pruebas, pasó 25
+  pruebas nuevas y encontró 9 problemas que las 27 anteriores no veían. Están todos arreglados:
+  ver **"Fase 3: hallazgos nuevos y cómo se han cerrado"**.
 
 ---
 
@@ -64,7 +71,7 @@ la autenticación.** Lo que más pesa: B1, B3, C1, C4 y C5.
 Los arreglos se hicieron con un equipo de tres agentes (cada uno con su zona de código reservada; el
 padre, Zeirt, revisó el diff y repitió las pruebas). El reparto está en `manageste.md`.
 
-Después se repitieron las 28 pruebas sobre la app ya arreglada. **Cómo se comprobó:** la app servida
+Después se repitieron las 27 pruebas sobre la app ya arreglada. **Cómo se comprobó:** la app servida
 por HTTP **sin caché** (`Cache-Control: no-store`). Importante: con el `python -m http.server` a secas
 el navegador entrega el `app.js` viejo y las pruebas mienten; a la primera pasó eso y el error apuntaba
 a una línea que ya no existía.
@@ -84,8 +91,8 @@ a una línea que ya no existía.
 | B6 | Sin CSP | Media | **Cerrado** | meta CSP en `index.html`, verificada en `file://` con Chrome headless: el JS sigue corriendo |
 | C1 | Bypass del rate limit | Media | **Abierto por diseño** | sin servidor no hay arreglo; queda documentado como limitación aceptada |
 | C2 | El rate limit es local | Info | **Abierto por diseño** | ídem |
-| C3 | Enumeración de usuarios | Baja | **Cerrado** | el registro ya no confirma si el nombre existe; el login sigue con el mensaje genérico |
-| C4 | Colisión del hash | Media | **Cerrado** | la contraseña que colisionaba ya **no** entra: PBKDF2 con salt aleatorio por usuario |
+| C3 | Enumeración de usuarios | Baja | **Cerrado (fase 3)** | el registro da el mismo mensaje y el mismo comportamiento tanto si el nombre está libre como si ya existe; además el login tarda lo mismo en los dos casos (sin canal de tiempo) |
+| C4 | Colisión del hash | Media | **Cerrado (fase 3)** | la contraseña que colisionaba ya **no** entra: PBKDF2 con salt aleatorio por usuario. **Y las cuentas antiguas (con el hash FNV-1a) se desactivan al arrancar**, porque su hash de 32 bits sí se rompe por colisión |
 | C5 | Crack offline | Media | **Cerrado** | hash de 64 hex + salt de 32 hex por usuario, ~30 ms por hash (antes, instantáneo) |
 | C6 | Contraseñas flojas | Baja | **Cerrado** | mínimo 8, máximo 128 y 15 contraseñas comunes rechazadas |
 | C7 | La sesión no caduca | Info | **Abierto por diseño** | ídem |
@@ -104,13 +111,47 @@ no se ha disfrazado con seguridad falsa: está escrito como limitación aceptada
 
 ### Cambios de formato de datos (compatibles)
 - El usuario ahora lleva `salt` (`{ username, usernameKey, passwordHash, salt, createdAt }`).
-- Las cuentas viejas (sin `salt`) **siguen entrando**: se validan con el hash antiguo y se re-hashean
-  solas con PBKDF2 en el primer login correcto. Comprobado.
-- Las sesiones siguen igual: `{ date, topic, minutes }`.
+- Las cuentas viejas (sin `salt`) **ya no se validan**: se desactivan al arrancar (fase 3). Su hash
+  era FNV-1a de 32 bits, que se rompe por colisión, así que no se pueden comprobar sin abrir ese
+  agujero. **No se pierde nada de lo estudiado**: las sesiones viven en `diario-estudio-sesiones`, no
+  en la cuenta; solo hay que crear la cuenta otra vez con el mismo nombre.
+- Las sesiones siguen igual: `{ date, topic, minutes }`. Los minutos admiten **un decimal** (12.5).
 
 ### Lo que se añadió además
 - Sección "🤖 Agentes" en la app: muestra el equipo y qué hace cada uno (`manageste.md`).
 - `manageste.md`: estructura de delegación, zonas reservadas y protocolo.
+
+---
+
+## Fase 3: hallazgos nuevos y cómo se han cerrado
+
+El **Inspector (Agente 3)** repitió las 27 pruebas sobre la app ya arreglada y pasó **25 pruebas
+nuevas** (límites de usuario y contraseña, Unicode, 5.000 sesiones, dos pestañas, cronómetro,
+gráficos, CSP, `localStorage` bloqueado...). De ahí salieron **9 problemas que las 27 pruebas
+anteriores no veían**. Zeirt los arregló y los volvió a comprobar uno por uno en el navegador.
+
+| # | Hallazgo | Gravedad | Estado | Cómo se comprueba |
+|---|----------|----------|--------|-------------------|
+| H1 | `localStorage` sin protección: la app **moría al arrancar** y `registerUser()`/`loginUser()` **lanzaban excepciones** | Media | **Cerrado** | con `localStorage` bloqueado (lanza `SecurityError`): la app **arranca** (5 agentes, 3 pestañas) y el registro/login devuelven un mensaje en vez de reventar |
+| H2 | **Canal de tiempo**: el login con usuario inexistente tardaba 0 ms y con usuario existente 30 ms (×2990) | Media | **Cerrado** | ahora se calcula un hash "de mentira" cuando el usuario no existe: **39 ms vs 36 ms (×1,08)** |
+| H3 | El **registro** seguía diciendo si el nombre ya existía ("¡Cuenta creada!" vs "no se ha podido crear...") | Media | **Cerrado** | alta, nombre repetido y nombre libre → **el mismo mensaje y el mismo comportamiento** en los tres casos |
+| H4 | La colisión de FNV-1a **seguía abriendo cuentas antiguas** (login con una contraseña ajena: "Sesión iniciada.") | Media | **Cerrado** | una cuenta sin `salt` no se puede validar (login genérico) y **se borra al arrancar**: el nombre queda libre para crear la cuenta otra vez |
+| H5 | Sesiones de **0 o negativos** contaban como día de racha y salían "-500 min" en la lista | Baja | **Cerrado** | hoy con 0 min y ayer con −500 min → se descartan: racha **1** (solo el día real), semana **30** y la lista solo enseña las sesiones válidas |
+| H6 | **Dos pestañas no se sincronizaban**: al guardar en una, la otra no actualizaba lista ni racha | Baja | **Cerrado** | la segunda pestaña escribe y la primera se actualiza sola (evento `storage`) |
+| H7 | Al cerrar el modal el **foco se perdía** (caía al `BODY`): `#login-link` era un `<span>` sin `tabindex` | Info | **Cerrado** | `#login-link` y `#logout-link` son `<button>`: al cerrar el modal el foco vuelve al botón (`focoAlCerrar: "login-link"`) |
+| H8 | El modal **no tenía trampa de foco**: con `Tab` el foco se salía a la página de detrás | Info | **Cerrado** | `Tab` en el último elemento vuelve al primero; con `Shift+Tab` en el primero, al último |
+| H9 | `parseInt` **truncaba los minutos decimales** (12.5 → 12) y el cronómetro usaba otro criterio | Info | **Cerrado** | 12.5 → se guarda **12.5**; los dos caminos (formulario y cronómetro) redondean a un decimal |
+| H10 | El informe decía "28 pruebas" y la tabla tenía **27** ids | Info | **Cerrado** | recuento corregido en todo el archivo |
+
+**El veredicto del Inspector fue "GO condicionado"**: sin bloqueantes de seguridad reales (la app es
+local, sin red y sin datos sensibles), pero con dos condiciones que Zeirt cumplir: arreglar H1 y
+**dejar de decir en este informe que C3 y C4 estaban cerrados cuando no lo estaban**. Los dos están
+cerrados de verdad ahora, y se puede comprobar en la tabla de arriba.
+
+### Lo que sigue abierto después de la fase 3
+Nada nuevo. Las limitaciones de siempre (C1, C2, C7, C8 y el resto de B3) siguen sin arreglo real
+sin backend y están documentadas como aceptadas en `AGENTS.md`. No se ha disfrazado ninguna con
+seguridad falsa.
 
 ---
 
@@ -413,6 +454,8 @@ Lo que **sí** se puede arreglar, en este orden:
 - [x] Mover a `AGENTS.md` las reglas permanentes que salgan de aquí → **hecho**: validación al leer de
       `localStorage`, PBKDF2 con salt, CSP con `file:`, y el bloque de limitaciones aceptadas.
 - [x] Repetir estas pruebas después de los arreglos → **hecho**: tabla de arriba.
-- [ ] Cerrar los hallazgos nuevos que encontró el Inspector (Agente 3) en la fase 3.
+- [x] Cerrar los hallazgos nuevos que encontró el Inspector (Agente 3) en la fase 3 → **hecho**:
+      los 9 (H1-H9) están arreglados y comprobados en el navegador; el recuento de pruebas
+      corregido (H10). Ninguno queda abierto.
 - [ ] Decidir si las sesiones se separan por usuario (hoy la lista es global).
 - [ ] Decidir si se documenta el bloque de Términos y Condiciones de `index.html`.
