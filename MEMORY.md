@@ -12,7 +12,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Tres pestañas (Diario, Cronómetro, Gráficos).
 - Claves en localStorage (prefijo `diario-estudio-`): `sesiones`, `sesiones-<usuario>`, `tema`, `usuarios`, `sesion`, `login-intentos`, `cronometro`. Sin prefijo es un error.
 - **El panel «🤖 Agentes» se quitó de la interfaz** a petición de Feirt (no se veía bien en la web): se borraron su bloque de `index.html`, el array `AGENTS`, `renderAgents()`, su constante `agentList` y todo su CSS. El equipo de agentes **solo vive en `manageste.md` y `AGENTS.md`**: no lo vuelvas a pintar en la app.
-- Versionado: rama `master` → `https://github.com/Feirt00/Agentes.git` (subida a `origin`). La rama temporal `agentes-de-la-web` **se borró** (remoto y local). En ese repo `main` es de otro proyecto de Feirt: no mezclarla ni borrarla.
+- Versionado: rama `master` → `https://github.com/Feirt00/Diario-Estudio.git` (subida a `origin`; **el repo se renombró** —antes era `Feirt00/Agentes` y esa URL solo redirige—). La rama temporal `agentes-de-la-web` **se borró** (remoto y local). En ese repo `main` es de otro proyecto de Feirt: no mezclarla ni borrarla.
 
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic (`file://`).

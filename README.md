@@ -94,5 +94,5 @@ sin servidor. Todos los detalles y limitaciones están documentados con honestid
 
 ## Repositorio
 
-- GitHub: **<https://github.com/Feirt00/Agentes>**
+- GitHub: **<https://github.com/Feirt00/Diario-Estudio>** (antes se llamaba `Agentes`: la URL vieja solo redirige)
 - Rama principal: `master` (la rama `main` es de otro proyecto y se deja intacta).
