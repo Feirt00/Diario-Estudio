@@ -8,7 +8,8 @@
 body
 {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f5f5f5;
+    background: linear-gradient(180deg, #eef1fb 0%, #f5f6fa 55%, #f4f1fb 100%);
+    background-attachment: fixed;
     min-height: 100vh;
     padding: 20px;
     color: #333;
@@ -18,7 +19,7 @@ body
 /* Modo oscuro */
 body.dark
 {
-    background: #1a1a2e;
+    background: linear-gradient(180deg, #131a30 0%, #14142a 60%, #191430 100%);
     color: #e0e0e0;
 }
 
@@ -27,15 +28,24 @@ body.dark
     max-width: 500px;
     margin: 0 auto;
     background: white;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(102, 126, 234, 0.12);
+    border-radius: 22px;
+    padding: 26px;
+    box-shadow: 0 14px 44px rgba(30, 41, 82, 0.12);
     transition: background 0.3s;
+}
+
+/* Sin esto la app seguiría visible con [hidden]: la regla gana al [hidden] del navegador */
+.container[hidden]
+{
+    display: none;
 }
 
 body.dark .container
 {
     background: #16213e;
+    border-color: #26356b;
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
 }
 
 .header
@@ -50,17 +60,21 @@ h1
 {
     color: #667eea;
     font-size: 1.5em;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .theme-btn
 {
-    background: none;
+    background: rgba(102, 126, 234, 0.08);
     border: none;
     font-size: 1.5em;
     cursor: pointer;
     padding: 8px;
     border-radius: 50%;
-    transition: background 0.3s;
+    transition: background 0.3s, transform 0.2s;
     width: auto;
 }
 
@@ -127,6 +141,7 @@ body.dark .auth-username
 .theme-btn:hover
 {
     background: rgba(0, 0, 0, 0.1);
+    transform: scale(1.08);
 }
 
 body.dark .theme-btn:hover
@@ -151,11 +166,12 @@ body.dark h2
 .streak-box
 {
     text-align: center;
-    padding: 20px;
+    padding: 22px;
     background: linear-gradient(135deg, #ff6b6b, #ffa726);
-    border-radius: 12px;
-    margin-bottom: 20px;
+    border-radius: 18px;
+    margin-bottom: 22px;
     color: white;
+    box-shadow: 0 10px 26px rgba(255, 107, 107, 0.35);
 }
 
 .streak-number
@@ -212,81 +228,194 @@ body.dark h2
     opacity: 0.9;
 }
 
-/* Modal de acceso */
-.modal
+/* Pantalla de acceso: se ve antes de entrar a la app */
+.acceso
 {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
-    z-index: 10;
+    background: linear-gradient(160deg, #eef1fb 0%, #f5f6fa 55%, #f3ecfb 100%);
+    z-index: 20;
+    overflow-y: auto;
 }
 
-.modal[hidden]
+body.dark .acceso
+{
+    background: linear-gradient(160deg, #131a30 0%, #14142a 60%, #1a1430 100%);
+}
+
+.acceso[hidden]
 {
     display: none;
 }
 
-.modal-content
+.acceso-card
 {
-    position: relative;
     background: white;
-    border-radius: 12px;
-    padding: 24px;
+    border: 1px solid rgba(102, 126, 234, 0.14);
+    border-radius: 24px;
+    padding: 34px 30px;
     width: 100%;
-    max-width: 360px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(30, 41, 82, 0.16);
+    text-align: center;
+    animation: acceso-entra 0.35s ease;
 }
 
-body.dark .modal-content
+/* La tarjeta entra suave al aparecer */
+@keyframes acceso-entra
+{
+    from
+    {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to
+    {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+body.dark .acceso-card
 {
     background: #16213e;
+    border-color: #26356b;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
 }
 
-.modal-content h2
+.acceso-logo
 {
-    margin-top: 0;
-    margin-bottom: 16px;
-    text-align: center;
+    display: block;
+    font-size: 2.6em;
 }
 
-.modal-close
+.acceso-titulo
 {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: none;
+    margin: 8px 0 4px;
+    font-size: 1.5em;
+    color: #667eea;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.acceso-subtitulo
+{
+    margin-bottom: 22px;
+    font-size: 0.9em;
+    /* Gris con contraste AA (4,95:1 sobre blanco) — el #888 se quedaba en 3,54 */
+    color: #707070;
+}
+
+body.dark .acceso-subtitulo
+{
+    color: #9aa7c7;
+}
+
+/* Pestañas "Iniciar sesión" / "Crear cuenta" */
+.acceso-tabs
+{
+    display: flex;
+    gap: 6px;
+    padding: 5px;
+    margin-bottom: 20px;
+    background: #f1f3fb;
+    border-radius: 14px;
+}
+
+body.dark .acceso-tabs
+{
+    background: #101935;
+}
+
+.acceso-tab
+{
+    flex: 1;
+    padding: 10px;
     border: none;
-    font-size: 1.1em;
+    border-radius: 10px;
+    background: none;
+    color: #667;
+    font-size: 0.92em;
+    font-weight: 600;
     cursor: pointer;
-    color: #999;
-    padding: 4px 8px;
-    width: auto;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
-.modal-close:hover
+.acceso-tab.activa
 {
-    color: #333;
+    background: white;
+    /* Indigo oscuro: AA sobre blanco (5,75:1) — #5a6fd6 se quedaba en 4,49 */
+    color: #4f5bc7;
+    box-shadow: 0 3px 10px rgba(30, 41, 82, 0.12);
 }
 
-body.dark .modal-close:hover
+body.dark .acceso-tab
 {
-    color: #e0e0e0;
+    color: #9aa7c7;
 }
 
+body.dark .acceso-tab.activa
+{
+    background: #22305c;
+    color: #cdd6ff;
+}
+
+.acceso-form
+{
+    text-align: left;
+}
+
+.acceso-invitado
+{
+    margin-top: 18px;
+    font-size: 0.88em;
+}
+
+.acceso-invitado a
+{
+    /* Mismo índigo de la app (#4f46e5): AA sobre blanco (6,29:1) */
+    color: #4f46e5;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.acceso-invitado a:hover
+{
+    text-decoration: underline;
+}
+
+/* En oscuro hace falta aclarar el enlace: #4f46e5 sobre #16213e no llega a AA */
+body.dark .acceso-invitado a
+{
+    color: #8b9aff;
+}
+
+.acceso-nota
+{
+    margin-top: 14px;
+    font-size: 0.75em;
+    color: #707070;
+}
+
+body.dark .acceso-nota
+{
+    color: #9aa7c7;
+}
+
+/* Avisos de acceso (errores y confirmaciones) */
 .auth-message
 {
     font-size: 0.85em;
     margin-bottom: 12px;
     text-align: center;
     padding: 8px;
-    border-radius: 6px;
+    border-radius: 10px;
 }
 
 .auth-message.error
@@ -301,35 +430,16 @@ body.dark .modal-close:hover
     color: #006600;
 }
 
-.auth-toggle
+body.dark .auth-message.error
 {
-    margin-top: 16px;
-    font-size: 0.85em;
-    text-align: center;
-    color: #888;
+    background: #4a1f1f;
+    color: #ffb3b3;
 }
 
-body.dark .auth-toggle
+body.dark .auth-message.success
 {
-    color: #888;
-}
-
-.auth-toggle a
-{
-    color: #667eea;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.auth-toggle a:hover
-{
-    text-decoration: underline;
-}
-
-#auth-submit[disabled]
-{
-    background: #aab;
-    cursor: not-allowed;
+    background: #1f4a2a;
+    color: #b3ffb3;
 }
 
 /* Formulario */
@@ -354,19 +464,19 @@ body.dark label
 input
 {
     width: 100%;
-    padding: 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1.5px solid #e3e6f2;
+    border-radius: 12px;
     font-size: 1em;
-    transition: border-color 0.3s;
+    transition: border-color 0.3s, box-shadow 0.3s;
     background: white;
     color: #333;
 }
 
 body.dark input
 {
-    background: #0f3460;
-    border-color: #0f3460;
+    background: #101935;
+    border-color: #26356b;
     color: #e0e0e0;
 }
 
@@ -374,25 +484,42 @@ input:focus
 {
     outline: none;
     border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
 }
 
 button[type="submit"]
 {
     width: 100%;
     padding: 14px;
-    background: #667eea;
+    background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 1em;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
 }
 
 button[type="submit"]:hover
 {
-    background: #5a6fd6;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+}
+
+button[type="submit"]:active
+{
+    transform: translateY(0);
+}
+
+/* Botón deshabilitado mientras se calcula el hash o mientras dura el bloqueo
+   de rate limit (antes lo tenía #auth-submit y se perdió con el modal) */
+#acceso-enviar:disabled
+{
+    background: #aab;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
 }
 
 /* Mensaje del formulario (error o confirmación) */
@@ -437,8 +564,11 @@ body.dark .form-message.success
 
 #session-list li
 {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
+    padding: 12px 14px;
+    background: #fafbff;
+    border: 1px solid #eceff9;
+    border-radius: 12px;
+    margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -446,23 +576,26 @@ body.dark .form-message.success
 
 body.dark #session-list li
 {
-    border-bottom-color: #0f3460;
+    background: #1b2544;
+    border-color: #26356b;
 }
 
 #session-list li:last-child
 {
-    border-bottom: none;
+    margin-bottom: 0;
 }
 
+/* Grises con contraste AA: #707070 en claro (≥4,8:1 sobre las tarjetas) y
+   variantes claras en oscuro — los #888/#999/#666/#555 se quedaban por debajo */
 .session-date
 {
-    color: #888;
+    color: #707070;
     font-size: 0.9em;
 }
 
 body.dark .session-date
 {
-    color: #666;
+    color: #9aa7c7;
 }
 
 .session-topic
@@ -474,14 +607,19 @@ body.dark .session-date
 
 .session-minutes
 {
-    color: #667eea;
+    color: #5560d6;
     font-weight: 600;
+}
+
+body.dark .session-minutes
+{
+    color: #8b9aff;
 }
 
 .empty-message
 {
     text-align: center;
-    color: #999;
+    color: #707070;
     padding: 20px;
     font-style: italic;
 }
@@ -489,39 +627,42 @@ body.dark .session-date
 /* Términos y Condiciones */
 .terms
 {
-    margin-top: 32px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
+    margin-top: 28px;
+    padding: 16px;
+    background: #f8f9fe;
+    border: 1px dashed #dfe4f5;
+    border-radius: 14px;
 }
 
 body.dark .terms
 {
-    border-top-color: #0f3460;
+    background: #131c38;
+    border-color: #26356b;
 }
 
 .terms h3
 {
     font-size: 0.9em;
-    color: #888;
+    color: #707070;
     margin-bottom: 12px;
 }
 
 .terms p
 {
     font-size: 0.8em;
-    color: #999;
+    color: #707070;
     margin-bottom: 6px;
     line-height: 1.4;
 }
 
 body.dark .terms h3
 {
-    color: #666;
+    color: #9aa7c7;
 }
 
 body.dark .terms p
 {
-    color: #555;
+    color: #8b96b8;
 }
 
 /* Pestañas */
@@ -529,15 +670,16 @@ body.dark .terms p
 {
     display: flex;
     gap: 6px;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+    margin-bottom: 22px;
+    padding: 6px;
+    background: #f1f3fb;
+    border-radius: 16px;
     flex-wrap: wrap;
 }
 
 body.dark .tabs
 {
-    border-bottom-color: #0f3460;
+    background: #101935;
 }
 
 .tab-button
@@ -545,33 +687,36 @@ body.dark .tabs
     flex: 1;
     min-width: 90px;
     padding: 10px 8px;
-    border: 1px solid #eee;
-    border-radius: 10px;
-    background: #fafafa;
-    color: #666;
+    border: none;
+    border-radius: 12px;
+    background: none;
+    color: #667;
     font-size: 0.9em;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
 body.dark .tab-button
 {
-    background: #1f2a4a;
-    border-color: #0f3460;
-    color: #aaa;
+    color: #9aa7c7;
 }
 
 .tab-button:hover
 {
-    border-color: #667eea;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+body.dark .tab-button:hover
+{
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .tab-button.active
 {
-    background: #667eea;
-    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
     font-weight: bold;
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
 }
 
 /* Paneles de las pestañas */
@@ -638,33 +783,40 @@ body.dark .tab-button
     flex: 1;
     min-width: 100px;
     padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
+    border: 1.5px solid #e3e6f2;
+    border-radius: 12px;
     background: white;
     color: #333;
     font-size: 0.95em;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 body.dark .timer-btn
 {
-    background: #1f2a4a;
-    border-color: #0f3460;
+    background: #1b2544;
+    border-color: #26356b;
     color: #ddd;
 }
 
 .timer-btn.primary
 {
-    background: #667eea;
-    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent;
     color: white;
     font-weight: bold;
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
 }
 
 .timer-btn:hover:not(:disabled)
 {
     border-color: #667eea;
+    transform: translateY(-1px);
+}
+
+.timer-btn.primary:hover:not(:disabled)
+{
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
 }
 
 .timer-btn:disabled
@@ -1254,19 +1406,21 @@ body.dark .chart-detail-minutes
 {
     font: inherit;
     font-size: 0.9em;
-    padding: 6px 8px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
+    padding: 7px 10px;
+    border: 1.5px solid #d7dcf0;
+    border-radius: 10px;
     background: #fff;
     color: inherit;
     cursor: pointer;
     max-width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .filter-select:focus
 {
-    outline: 2px solid #4f46e5;
-    outline-offset: 2px;
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
 }
 
 body.dark .filter-label
@@ -1276,7 +1430,7 @@ body.dark .filter-label
 
 body.dark .filter-select
 {
-    background: #1f2430;
-    border-color: #3a4152;
+    background: #1b2544;
+    border-color: #26356b;
     color: #e5e7eb;
 }

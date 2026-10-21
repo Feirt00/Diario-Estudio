@@ -182,6 +182,29 @@ punto de partida.
 
 ---
 
+## Fase 7: pantalla de acceso (el modal desaparece) + rediseño
+
+Zeirt sustituyó el modal `#auth-modal` por una **pantalla de acceso completa** (`#pantalla-acceso`)
+que se ve antes de entrar: iniciar sesión, crear cuenta o **entrar sin cuenta**. El contenedor `#app`
+arranca con `hidden` y la decisión vive en el JS: `validateSession()` al arrancar → `mostrarApp()` o
+`mostrarPantallaAcceso()`; cerrar sesión vuelve a la pantalla.
+
+| # | Qué cambia | Estado | Cómo se comprueba |
+|---|---|---|---|
+| F7-1 | **E1/H8 dejan de aplicar**: no hay modal que cierre `Escape` ni trampa de foco que mantener. No es una regresión: con pantalla completa no hay nada que cerrar ni detrás a donde escapar | **Sin objeto** | 10 pulsaciones de Tab desde la pantalla de acceso nunca entran en `#app`; de los 19 elementos enfocables de la app, **0** consiguen foco mientras está oculta; `Escape` no rompe nada |
+| F7-2 | El botón **"Entrar"** de la cabecera (modo invitado) reabre la pantalla; H7 sigue cumplido: al mostrarse, el foco va a `#acceso-usuario` | **Cerrado** | como invitado → "Entrar" → foco en el campo de usuario |
+| F7-3 | La parte histórica de **A3** (el `innerHTML` del modal) ya no existe: grep de `innerHTML` en `app.js` = 0 (solo un comentario). `renderAuthStatus()` y todo lo nuevo pintan con `textContent` | **Cerrado** | grep + XSS en vivo del Inspector fase 7: 0 ejecuciones, 0 diálogos JS |
+| F7-4 | Contraste AA de los textos nuevos de la tarjeta de acceso | **Cerrado** | `.acceso-subtitulo`, `.acceso-nota`, `.acceso-invitado a` y `.acceso-tab.activa` ≥4,5:1 en claro (los tres primeros a ~5-6:1); el enlace tiene variante clara (`#8b9aff`) en oscuro |
+| F7-5 | Se perdió el estilo del botón deshabilitado del modal | **Cerrado** | `#acceso-enviar:disabled` (fondo `#aab`, sin sombra ni elevación) |
+
+**Veredicto del Inspector (Agente 3) sobre la fase 7: GO** — 94 comprobaciones (10 estáticas, 65
+dinámicas en Chrome headless con perfil nuevo, 19 de contraste), **94 OK, 0 bloqueantes**, 0
+excepciones JS, 0 recursos fallidos y 0 avisos de CSP. Las 6 incidencias que quedó fueron todas
+cosméticas: contraste y botón deshabilitado los arregló Zeirt aquí; las de documentación se
+actualizaron en el mismo cierre. Las pruebas del Inspector están en Temp (`verificacion-v20*.js`).
+
+---
+
 ## Lo que hay que arreglar primero
 
 1. **B1 — `loadSessions()` sin `try/catch`.** Un solo carácter corrupto en

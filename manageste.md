@@ -14,7 +14,7 @@ Cómo funciona el equipo de agentes de este proyecto y qué está haciendo cada 
 |--------|-----|---------------------------|
 | **Zeirt** (padre) | Decide qué se hace, delega, **verifica** el trabajo de los otros y completa lo que falte. Es el único que commitea. | Toda la app (revisión final) |
 | **Agente 1 — Guardian de los Datos** | Robustez de datos: lectura/escritura de `localStorage`, validación de lo guardado, totales y **sesiones por usuario** | `loadSessions`, `saveSessions`, `getSessionsKey`, `migrateSessionsToUser`, `parseSessions`, `refreshCurrentUserViews`, `formatDate`, `calculateWeekMinutes`, `updateSessionList`, `createSessionItem`, submit del formulario de estudio, `#form-message` |
-| **Agente 2 — Criptógrafo del Acceso** | Acceso de usuarios: hash, contraseñas, sesión, registro y login | `hashPassword`, `usernameKey`, `*Users`, `*Session`, `*Attempts`, `registerUser`, `loginUser`, `logoutUser`, `renderAuthStatus`, modal de acceso. Zeirt engancha `refreshCurrentUserViews()` al entrar y salir |
+| **Agente 2 — Criptógrafo del Acceso** | Acceso de usuarios: hash, contraseñas, sesión, registro y login | `hashPassword`, `usernameKey`, `*Users`, `*Session`, `*Attempts`, `registerUser`, `loginUser`, `logoutUser`, `renderAuthStatus`, zona de pantalla de acceso (`mostrarPantallaAcceso`, `mostrarApp`, `accesoCambiarModo` y el arranque). Zeirt engancha `refreshCurrentUserViews()` al entrar y salir |
 | **Agente 3 — Inspector (QA)** | Verifica los arreglos contra `vulnerabilities.md` y busca fallos nuevos | **Ninguna**: solo lee, prueba y escribe el informe |
 | **Agente 4 — Analista de Datos** | Gráficos de estudio: barras, circular y línea, dibujados a mano en SVG, con **ventana de días movible y detalle por día** | `renderCharts`, `renderBarChart`, `getDailyMinutes`, `renderChartDays`, `renderChartDetail`, `moveChartDays`, `toggleChartDay` + estilos `.chart*` / `.top-list` |
 
@@ -180,7 +180,7 @@ arreglo real** y se aceptan como limitación (documentadas en `AGENTS.md`):
    colisión y no se pueden validar sin abrir ese agujero. Se borran al arrancar; **no se pierde nada de
    lo estudiado**, pero hay que crear la cuenta otra vez con el mismo nombre.
 
-### Fase 6 — Filtros de periodo (lista y gráfico de pastel) — **EN CURSO**
+### Fase 6 — Filtros de periodo (lista y gráfico de pastel) — **CERRADA**
 
 Feirt pidió: que la lista "Sesiones" deje de enseñar todo de golpe (que por defecto salga **solo hoy**,
 con un desplegable: última semana / último mes / todo el historial) y que el gráfico de pastel pueda
@@ -206,6 +206,27 @@ mostrar **hoy**, **lo que se estudió en el día elegido** (la barra pulsada en 
 - Dos fallos que salieron fueron **de su propia prueba**, no del código (buscaba la barra por un texto
   equivocado y el cambio de cuenta no probaba el caso real): corrigió la prueba y repitió.
 
+### Fase 7 — Pantalla de acceso + rediseño suave — **CERRADA**
+
+Feirt pidió: que al abrir la web se vea una pantalla de acceso antes de la app (sin modal, que ya no
+convencía) y un **rediseño "suave y redondeado"** de toda la interfaz, en claro y oscuro.
+
+| Agente | Tarea | Estado |
+|--------|-------|--------|
+| **Zeirt (padre)** | HTML y CSS: nueva `#pantalla-acceso` (pestañas Iniciar sesión / Crear cuenta + enlace **"Entrar sin cuenta"** para invitados), `#app` arranca oculto, modal `#auth-modal` eliminado por completo, rediseño completo (degradados, radios 22/24/12, pestañas píldora, foco con `box-shadow`, sesiones en tarjetitas) y favicon `data:,` para que la consola quede limpia | **Terminado** |
+| **Agente 2 — Criptógrafo del Acceso** | `app.js`: constantes de la zona de acceso, `accesoCambiarModo()`, `mostrarPantallaAcceso()` / `mostrarApp()`, logout que vuelve a la pantalla, registro que cambia solo a modo login, rate limit apuntando a los elementos nuevos y arranque (`const sesionIniciada = validateSession()`) | **Terminado**: diff verificado hunk por hunk por Zeirt; `node --check` limpio y greps sin restos del modal |
+| **Agente 3 — Inspector** | Verificación completa de la fase | **Terminado**: veredicto **GO** — 94 comprobaciones (10 estáticas, 65 dinámicas con perfil nuevo, 19 de contraste), 94 OK, 0 bloqueantes, 0 excepciones JS, 0 recursos fallidos, 0 avisos de CSP. Sin restos del modal; el teclado no entra en `#app` oculta; Enter envía el formulario; rate limit y anti-enumeración intactos (canal de tiempo 1,40×) |
+| **Zeirt (padre)** | Arreglar las 6 incidencias cosméticas del Inspector y documentar | **Terminado**: contraste AA en `.acceso-subtitulo`, `.acceso-nota`, `.acceso-invitado a`, `.acceso-tab.activa`, `.session-date`, `.session-minutes`, `.empty-message` y `.terms` (claro y oscuro); `#acceso-enviar:disabled` recuperado; `MEMORY.md`, `AGENTS.md` y `vulnerabilities.md` al día |
+
+**Lo que hizo Zeirt como padre en esta fase:**
+- Definió la pantalla y su CSS él mismo (HTML/CSS es su zona) y delegó solo la parte de `app.js` al
+  Agente 2, con la zona reservada de acceso ya delimitada.
+- Verificó el diff del Agente 2 **hunk por hunk**: solo constantes, zona de acceso y arranque; sin
+  tocar zonas del Agente 1 ni del Agente 4.
+- Baterías propias v19/v19b/v19c en verde (acceso, registro, logout, invitado, recarga con sesión,
+  móvil 350 px, filtros y gráficos intactos).
+- Tras el GO del Inspector aplicó los arreglos cosméticos y repitió la comprobación de contraste.
+
 ---
 
 ## 6. Historial de fases
@@ -220,3 +241,4 @@ mostrar **hoy**, **lo que se estudió en el día elegido** (la barra pulsada en 
 | 2026-10-21 | Fase 5 (datos por usuario + gráficos navegables) | Agente 1 (sesiones por cuenta) y Agente 4 (ventana de días + detalle), Zeirt verificando e integrando |
 | 2026-10-21 | Fase 6 (filtros de periodo) | Agente 1 (filtro de la lista) y Agente 4 (filtro del pastel) en paralelo, Agente 3 (Inspector) con veredicto **GO** y Zeirt integrando; batería v18 en verde |
 | 2026-10-21 | Limpieza (panel «🤖 Agentes» fuera de la interfaz) | Zeirt: borrado el bloque de `index.html`, el array `AGENTS`, `renderAgents()`, su constante y todo su CSS. Sin restos (grep a 0) y la app comprobada con 0 excepciones. El equipo solo vive en `manageste.md` y `AGENTS.md` |
+| 2026-10-21 | Fase 7 (pantalla de acceso + rediseño) | Zeirt (HTML/CSS) y Agente 2 (`app.js`) — modal eliminado, pantalla `#pantalla-acceso` con invitado, rediseño claro/oscuro — con Inspector **GO** (94/94) y cosméticas de contraste cerradas por Zeirt; README.md nuevo |

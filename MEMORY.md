@@ -3,15 +3,16 @@
 Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo que ya no aporte.
 
 ## Estado actual
+- v1.9 (fase 7): **pantalla de acceso + rediseño suave**. La app arranca con `#app` oculto y `#pantalla-acceso` visible (iniciar sesión / crear cuenta / **entrar sin cuenta**); cerrar sesión vuelve a la pantalla y con sesión guardada se entra directo. El modal `#auth-modal` desapareció: **E1/H8 ya no aplican** (no hay modal que cerrar y el foco no escapa porque la app está detrás con `[hidden]` — comprobado por el Inspector). Rediseño claro/oscuro (degradados, radios 22/24/12, pestañas píldora, foco luminoso, sesiones en tarjetitas) con contraste AA ajustado tras el informe del Inspector (**94/94, GO**). Nuevo `README.md` con la descripción del proyecto y el equipo de agentes.
 - v1.8 (fase 6): **filtros de periodo**. La lista "Sesiones" arranca en **Hoy** con desplegable (última semana / último mes / todo el historial) y el gráfico de pastel tiene su desplegable (global / hoy / **día elegido** —el día pulsado en las barras— / semana de lunes a hoy). Ambos filtros son **solo visuales**: racha, mejor racha y total de la semana siguen midiéndose con todo el historial.
 - v1.7 (fase 5): **datos por usuario** (sesiones, racha, totales y gráficos ya no se comparten entre cuentas) y **gráficos navegables** (ventana de 7 días movible con `‹`/`›` + detalle por día). Para comprobarlo en su navegador, Feirt tiene `crear-cuenta-feirt.html` (cuenta **feirt**, contraseña provisional `12345678`, 60 días de sesiones).
 - v1.6: auditoría de seguridad **cerrada** (commit `e4a1208`). Las 27 pruebas y los 9 hallazgos del Inspector (H1-H9) están en `vulnerabilities.md`.
-- Cerradas: B1, B2, B3, B4, B6, C3 (enumeración, sin canal de tiempo), C4/C5 (hash + cuentas antiguas desactivadas), C6, A3, D2, E1 (Escape + foco), E2, E3 y los 9 hallazgos del Inspector.
+- Cerradas: B1, B2, B3, B4, B6, C3 (enumeración, sin canal de tiempo), C4/C5 (hash + cuentas antiguas desactivadas), C6, A3, D2, E1 (Escape + foco, hoy sin objeto: no hay modal), E2, E3 y los 9 hallazgos del Inspector.
 - Sigue abierto **por diseño y sin arreglo posible** sin backend: C1/C2 (rate limit reseteable), C7 (la sesión no caduca), C8 (la app no está protegida), B3 residual (suplantar a un usuario que sí existe).
-- Tres pestañas (Diario, Cronómetro, Gráficos) y apartado "🤖 Agentes" (array `AGENTS` en `app.js`).
+- Tres pestañas (Diario, Cronómetro, Gráficos).
 - Claves en localStorage (prefijo `diario-estudio-`): `sesiones`, `sesiones-<usuario>`, `tema`, `usuarios`, `sesion`, `login-intentos`, `cronometro`. Sin prefijo es un error.
 - **El panel «🤖 Agentes» se quitó de la interfaz** a petición de Feirt (no se veía bien en la web): se borraron su bloque de `index.html`, el array `AGENTS`, `renderAgents()`, su constante `agentList` y todo su CSS. El equipo de agentes **solo vive en `manageste.md` y `AGENTS.md`**: no lo vuelvas a pintar en la app.
-- Versionado: rama `master` → `https://github.com/Feirt00/Agentes.git`, **ya subida** (sincronizada en v1.8) junto con la rama `agentes-de-la-web` (copia del mismo punto, creada a petición de Feirt para tener el proyecto web aparte). En ese repo `main` es otra cosa: no mezclarla ni borrarla.
+- Versionado: rama `master` → `https://github.com/Feirt00/Agentes.git` (subida a `origin`). La rama temporal `agentes-de-la-web` **se borró** (remoto y local). En ese repo `main` es de otro proyecto de Feirt: no mezclarla ni borrarla.
 
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic (`file://`).
@@ -38,8 +39,11 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - `saveSessions()` devuelve `{ ok, message }` y captura la cuota llena: el aviso sale en la página (`#form-message`), nunca en consola ni con `alert()`.
 - `hashPassword()`, `registerUser()` y `loginUser()` son async: quien las llama usa `await`. Validaciones y rate limit van DENTRO de esas funciones, no en el evento del formulario.
 - `app.js` tiene finales de línea mezclados (CRLF y LF): no normalizar el archivo entero (diff gigante). Al concatenar o reescribir con PowerShell 5.1 se rompen acentos y emojis: usar el editor de opencode.
-- **El modal de acceso abre SIEMPRE en modo *login***: para registrar por la interfaz hay que pulsar `#auth-toggle-link` ("Crear usuario") antes. Un test que no lo hace registra nada, `loginUser` falla y el resultado parece un bug de datos (se investigó un "duplicado" que era del test).
+- **La pantalla de acceso arranca en modo *login***: para registrar por la interfaz hay que pulsar `#acceso-tab-registro` ("Crear cuenta") antes. Un test que no lo hace registra nada, `loginUser` falla y el resultado parece un bug de datos (se investigó un "duplicado" que era del test).
 - En las baterías de pruebas, **`const R = []` con propiedades con nombre imprime `[]`**: `JSON.stringify` de un array solo serializa los índices. Para recoger resultados con nombre, usar `const R = {}` (le costó una repetición entera a la batería v18).
+- Al elegir un color nuevo hay que mirar **los dos temas**: un tono que pasa en claro no pasa en oscuro y al revés (el Inspector lo pilló en `.acceso-invitado a` y en `.session-date`).
 
 ## Próximos pasos
+- **Fase 8 en cola**: borrar sesiones con botón 🗑️ y confirmación en dos pasos (petición de Feirt; Agente 1, zona de datos).
+- **Fase 9 en cola**: agrupar temas en los gráficos sin importar mayúsculas/espacios (Agente 4; en cadena tras la fase 8 porque ambos tocan `app.js`).
 - Falta documentar el bloque de Términos y Condiciones de `index.html`.

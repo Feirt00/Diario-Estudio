@@ -86,6 +86,15 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 
 ## Autenticación (solo local, sin backend)
 - No hay servidor ni base de datos: usuarios y sesión viven en `localStorage`.
+- **Pantalla de acceso**: al abrir, si no hay sesión válida se ve `#pantalla-acceso` (iniciar sesión /
+  crear cuenta / **entrar sin cuenta** como invitado) y `#app` arranca con el atributo `hidden`. Quien
+  decide al arrancar es el JS: `validateSession()` → `mostrarApp()` o `mostrarPantallaAcceso()`. Cerrar
+  sesión vuelve a la pantalla. **No hay modal**: `#auth-modal` fue eliminado en la fase 7 (no hay nada
+  que cerrar con `Escape` ni trampa de foco que mantener; el foco no puede escapar a `#app` porque está
+  con `[hidden]`). Para pruebas, registrar exige pulsar `#acceso-tab-registro` ("Crear cuenta"); el
+  formulario es `#acceso-form` (`#acceso-usuario`, `#acceso-clave`, `#acceso-mensaje`, `#acceso-enviar`),
+  las pestañas son `#acceso-tab-login` / `#acceso-tab-registro`, el invitado es `#acceso-sin-cuenta` y
+  el botón de la cabecera que reabre la pantalla es `#login-link`.
 - Claves: `diario-estudio-usuarios` (array de `{ username, usernameKey, passwordHash, salt, createdAt }`), `diario-estudio-sesion` (sesión activa) y `diario-estudio-login-intentos` (rate limit).
 - Las contraseñas se guardan hasheadas, nunca en claro. El hash es **PBKDF2-HMAC-SHA256** con 210.000 iteraciones y **salt aleatorio por usuario** (campo `salt`), vía Web Crypto API. Si `crypto.subtle` no está disponible, se avisa y **no** se cae a un hash débil.
 - `hashPassword()`, `registerUser()` y `loginUser()` son **asíncronas**: quien las llama usa `await`.

@@ -20,16 +20,16 @@ const timerMessage = document.getElementById('timer-message');
 const timerDone = document.getElementById('timer-done');
 const timerSave = document.getElementById('timer-save');
 const authStatus = document.getElementById('auth-status');
-const authModal = document.getElementById('auth-modal');
-const authClose = document.getElementById('auth-close');
-const authForm = document.getElementById('auth-form');
-const authTitle = document.getElementById('auth-title');
-const authUsername = document.getElementById('auth-username');
-const authPassword = document.getElementById('auth-password');
-const authSubmit = document.getElementById('auth-submit');
-const authMessage = document.getElementById('auth-message');
-const authToggleText = document.getElementById('auth-toggle-text');
-const authToggleLink = document.getElementById('auth-toggle-link');
+const contenedorApp = document.getElementById('app');
+const pantallaAcceso = document.getElementById('pantalla-acceso');
+const accesoTabLogin = document.getElementById('acceso-tab-login');
+const accesoTabRegistro = document.getElementById('acceso-tab-registro');
+const accesoForm = document.getElementById('acceso-form');
+const accesoUsuario = document.getElementById('acceso-usuario');
+const accesoClave = document.getElementById('acceso-clave');
+const accesoMensaje = document.getElementById('acceso-mensaje');
+const accesoEnviar = document.getElementById('acceso-enviar');
+const accesoSinCuenta = document.getElementById('acceso-sin-cuenta');
 
 // Claves para localStorage
 // STORAGE_KEY es la clave global de las sesiones: se usa cuando no hay sesión
@@ -1026,8 +1026,7 @@ function renderAuthStatus()
         name.className = 'auth-username';
         name.textContent = user.username;
 
-        // Son <button> y no <span> para que se puedan enfocar con el teclado
-        // y el foco vuelva aquí al cerrar el modal.
+        // Son <button> y no <span> para que se puedan enfocar con el teclado.
         const exit = document.createElement('button');
         exit.type = 'button';
         exit.className = 'auth-link';
@@ -1043,69 +1042,28 @@ function renderAuthStatus()
         login.type = 'button';
         login.className = 'auth-link';
         login.id = 'login-link';
-        login.textContent = 'Iniciar sesión';
+        login.textContent = 'Entrar';
 
         authStatus.appendChild(login);
     }
 }
 
-// ---------- Modal ----------
+// ---------- Pantalla de acceso ----------
 
-// 'login' o 'register'
-let authMode = 'login';
+// 'login' o 'registro': modo de la pantalla de acceso
+let accesoModo = 'login';
 
 function setAuthMessage(text, type)
 {
     if (!text)
     {
-        authMessage.hidden = true;
-        authMessage.textContent = '';
+        accesoMensaje.hidden = true;
+        accesoMensaje.textContent = '';
         return;
     }
-    authMessage.hidden = false;
-    authMessage.textContent = text;
-    authMessage.className = 'auth-message ' + type;
-}
-
-// Cambiar el modo del modal ("login" o "register").
-// keepValues: si es true no se borra lo que el usuario escribió. Se usa al
-// terminar un registro, para que solo tenga que pulsar "Entrar".
-function setAuthMode(mode, keepValues)
-{
-    authMode = mode;
-    setAuthMessage('');
-
-    if (!keepValues)
-    {
-        clearAuthForm();
-    }
-
-    updateRateLimitUI();
-
-    if (mode === 'login')
-    {
-        authTitle.textContent = 'Iniciar sesión';
-        authSubmit.textContent = 'Entrar';
-        authPassword.setAttribute('placeholder', 'Tu contraseña');
-        authPassword.setAttribute('autocomplete', 'current-password');
-        authToggleText.textContent = '¿No tienes cuenta?';
-        authToggleLink.textContent = 'Crear usuario';
-    }
-    else
-    {
-        authTitle.textContent = 'Crear usuario';
-        authSubmit.textContent = 'Crear cuenta';
-        authPassword.setAttribute('placeholder', 'Mínimo ' + MIN_PASSWORD + ' caracteres');
-        authPassword.setAttribute('autocomplete', 'new-password');
-        authToggleText.textContent = '¿Ya tienes cuenta?';
-        authToggleLink.textContent = 'Iniciar sesión';
-    }
-}
-
-function clearAuthForm()
-{
-    authUsername.value = '';
-    authPassword.value = '';
+    accesoMensaje.hidden = false;
+    accesoMensaje.textContent = text;
+    accesoMensaje.className = 'auth-message ' + type;
 }
 
 // Activar o desactivar el formulario según el bloqueo por intentos
@@ -1114,56 +1072,56 @@ function updateRateLimitUI()
     const left = secondsLeftBlocked();
     if (left > 0)
     {
-        authSubmit.disabled = true;
-        authUsername.disabled = true;
-        authPassword.disabled = true;
+        accesoEnviar.disabled = true;
+        accesoUsuario.disabled = true;
+        accesoClave.disabled = true;
         setAuthMessage('Demasiados intentos fallidos. Inténtalo de nuevo en ' + left + ' s.', 'error');
     }
     else
     {
-        authSubmit.disabled = false;
-        authUsername.disabled = false;
-        authPassword.disabled = false;
+        accesoEnviar.disabled = false;
+        accesoUsuario.disabled = false;
+        accesoClave.disabled = false;
     }
 }
 
-// Elemento que tenía el foco antes de abrir el modal (para devolvérselo al cerrar)
-let lastFocusedElement = null;
-
-// Temporizador que cierra el modal tras un acceso correcto
-let authCloseTimer = null;
-
-function openAuthModal(mode)
+// Cambiar el modo de la pantalla de acceso ('login' o 'registro').
+// No borra lo que el usuario haya escrito: tras registrarse solo tiene que
+// pulsar "Entrar".
+function accesoCambiarModo(modo)
 {
-    // Si se reabre el modal antes de que se cierre solo, se cancela el cierre automático
-    if (authCloseTimer !== null)
-    {
-        clearTimeout(authCloseTimer);
-        authCloseTimer = null;
-    }
+    accesoModo = modo;
+    const enLogin = modo === 'login';
 
-    lastFocusedElement = document.activeElement;
-    authModal.hidden = false;
-    setAuthMode(mode);
-    authUsername.focus();
-}
+    accesoTabLogin.classList.toggle('activa', enLogin);
+    accesoTabRegistro.classList.toggle('activa', !enLogin);
+    accesoTabLogin.setAttribute('aria-selected', enLogin ? 'true' : 'false');
+    accesoTabRegistro.setAttribute('aria-selected', enLogin ? 'false' : 'true');
 
-function closeAuthModal()
-{
-    if (authCloseTimer !== null)
-    {
-        clearTimeout(authCloseTimer);
-        authCloseTimer = null;
-    }
+    accesoEnviar.textContent = enLogin ? 'Entrar' : 'Crear cuenta';
+    accesoClave.setAttribute('autocomplete', enLogin ? 'current-password' : 'new-password');
+    accesoClave.setAttribute('placeholder', enLogin ? 'Tu contraseña' : 'Mínimo ' + MIN_PASSWORD + ' caracteres');
 
-    authModal.hidden = true;
     setAuthMessage('');
+    updateRateLimitUI();
+}
 
-    // El foco vuelve al elemento que abrió el modal
-    if (lastFocusedElement && document.contains(lastFocusedElement))
-    {
-        lastFocusedElement.focus();
-    }
+// Mostrar la pantalla de acceso (con la app escondida) y enfocar el usuario
+function mostrarPantallaAcceso()
+{
+    pantallaAcceso.hidden = false;
+    contenedorApp.hidden = true;
+    setAuthMessage('');
+    updateRateLimitUI();
+    accesoUsuario.focus();
+}
+
+// Mostrar la app (con sesión o como invitado) y esconder la pantalla de acceso
+function mostrarApp()
+{
+    pantallaAcceso.hidden = true;
+    contenedorApp.hidden = false;
+    setAuthMessage('');
 }
 
 // ---------- Acciones ----------
@@ -1346,6 +1304,10 @@ function logoutUser()
 
     // Al salir se vuelve a la lista global (la que no tiene cuenta).
     refreshCurrentUserViews();
+
+    // Y a la pantalla de acceso, en modo login
+    accesoCambiarModo('login');
+    mostrarPantallaAcceso();
 }
 
 // ---------- Eventos ----------
@@ -1354,7 +1316,7 @@ authStatus.addEventListener('click', (e) =>
 {
     if (e.target.id === 'login-link')
     {
-        openAuthModal('login');
+        mostrarPantallaAcceso();
     }
     else if (e.target.id === 'logout-link')
     {
@@ -1362,46 +1324,48 @@ authStatus.addEventListener('click', (e) =>
     }
 });
 
-authClose.addEventListener('click', closeAuthModal);
-
-authModal.addEventListener('click', (e) =>
+accesoTabLogin.addEventListener('click', () =>
 {
-    if (e.target === authModal)
-    {
-        closeAuthModal();
-    }
+    accesoCambiarModo('login');
 });
 
-authToggleLink.addEventListener('click', (e) =>
+accesoTabRegistro.addEventListener('click', () =>
+{
+    accesoCambiarModo('registro');
+});
+
+// Entrar sin cuenta: la app se usa con la clave global de sesiones,
+// igual que antes del login.
+accesoSinCuenta.addEventListener('click', (e) =>
 {
     e.preventDefault();
-    setAuthMode(authMode === 'login' ? 'register' : 'login');
+    mostrarApp();
 });
 
-authForm.addEventListener('submit', async (e) =>
+accesoForm.addEventListener('submit', async (e) =>
 {
     e.preventDefault();
 
     // Se bloquea el botón mientras se calcula el hash para no mandar dos veces
-    authSubmit.disabled = true;
+    accesoEnviar.disabled = true;
 
-    const result = authMode === 'register'
-        ? await registerUser(authUsername.value.trim(), authPassword.value)
-        : await loginUser(authUsername.value.trim(), authPassword.value);
+    const result = accesoModo === 'registro'
+        ? await registerUser(accesoUsuario.value.trim(), accesoClave.value)
+        : await loginUser(accesoUsuario.value.trim(), accesoClave.value);
 
     // El registro SIEMPRE termina pidiendo iniciar sesión, diga lo que diga el
     // resultado. Así no se puede averiguar si el nombre ya estaba en uso
     // (prueba C3): el comportamiento es idéntico en los dos casos.
-    if (authMode === 'register')
+    if (accesoModo === 'registro')
     {
         if (result.ok)
         {
-            setAuthMode('login', true);
+            accesoCambiarModo('login');
             setAuthMessage(result.message, 'success');
         }
         else
         {
-            authSubmit.disabled = false;
+            accesoEnviar.disabled = false;
             setAuthMessage(result.message, 'error');
         }
         return;
@@ -1409,60 +1373,25 @@ authForm.addEventListener('submit', async (e) =>
 
     if (result.ok)
     {
-        setAuthMessage(result.message, 'success');
         renderAuthStatus();
 
         // Al entrar, las sesiones pasan a la cuenta del usuario (si las tenía
         // sin cuenta) y la vista se repinta con sus datos.
         refreshCurrentUserViews();
-
-        authCloseTimer = setTimeout(closeAuthModal, 600);
+        mostrarApp();
     }
     else
     {
+        accesoEnviar.disabled = false;
         setAuthMessage(result.message, 'error');
         updateRateLimitUI();
-    }
-});
-
-// Teclado dentro del modal de acceso:
-// - Escape cierra el modal.
-// - Tab no deja salir del modal (trampa de foco): al llegar al último elemento
-//   el foco vuelve al primero, y al revés con Shift.
-document.addEventListener('keydown', (e) =>
-{
-    if (authModal.hidden) return;
-
-    if (e.key === 'Escape')
-    {
-        closeAuthModal();
-        return;
-    }
-
-    if (e.key !== 'Tab') return;
-
-    const focusables = authModal.querySelectorAll('button, input, a[href], [tabindex]:not([tabindex="-1"])');
-    if (focusables.length === 0) return;
-
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-
-    if (e.shiftKey && document.activeElement === first)
-    {
-        e.preventDefault();
-        last.focus();
-    }
-    else if (!e.shiftKey && document.activeElement === last)
-    {
-        e.preventDefault();
-        first.focus();
     }
 });
 
 // Cuenta atrás mientras el bloqueo siga activo
 setInterval(() =>
 {
-    if (!authModal.hidden && secondsLeftBlocked() > 0)
+    if (!pantallaAcceso.hidden && secondsLeftBlocked() > 0)
     {
         updateRateLimitUI();
     }
@@ -3019,7 +2948,7 @@ loadTheme();
 // Las cuentas antiguas (con el hash débil) se desactivan antes de validar la sesión
 purgeLegacyUsers();
 // Si la sesión guardada no es válida (usuario inexistente o formato raro), se borra
-validateSession();
+const sesionIniciada = validateSession();
 renderAuthStatus();
 
 // Un solo repintado: racha, mejor racha, total de la semana, lista y gráficos.
@@ -3027,4 +2956,16 @@ refreshCurrentUserViews();
 
 restoreTimer();
 showTab('diario');
+
+// Con sesión válida se entra directo a la app; sin ella se ve la pantalla de
+// acceso. El HTML ya arranca así, pero la decisión vive aquí: si alguien
+// recarga con la sesión guardada, no se le vuelve a pedir el acceso.
+if (sesionIniciada)
+{
+    mostrarApp();
+}
+else
+{
+    mostrarPantallaAcceso();
+}
 

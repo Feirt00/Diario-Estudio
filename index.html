@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file:; img-src 'self' data:; object-src 'none'; base-uri 'none'">
     <title>Diario de Estudio</title>
+    <!-- Icono vacío en data:: evita el 404 de /favicon.ico en servidores locales -->
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <div id="app" class="container" hidden>
         <div class="header">
             <h1>📚 Diario de Estudio</h1>
             <div class="header-actions">
@@ -164,27 +166,36 @@
         </section>
     </div>
 
-    <!-- Modal de acceso -->
-    <div id="auth-modal" class="modal" hidden>
-        <div class="modal-content">
-            <button id="auth-close" class="modal-close" type="button" title="Cerrar">✕</button>
-            <h2 id="auth-title">Iniciar sesión</h2>
-            <form id="auth-form">
+    <!-- Pantalla de acceso: se ve antes de entrar a la app.
+         Si hay sesión guardada, app.js la esconde y muestra la app directamente. -->
+    <div id="pantalla-acceso" class="acceso">
+        <div class="acceso-card">
+            <span class="acceso-logo" aria-hidden="true">📚</span>
+            <h1 class="acceso-titulo">Diario de Estudio</h1>
+            <p class="acceso-subtitulo">Tu racha, tus sesiones y tus gráficos, siempre contigo.</p>
+
+            <div class="acceso-tabs" role="tablist" aria-label="Modo de acceso">
+                <button type="button" id="acceso-tab-login" class="acceso-tab activa" role="tab" aria-selected="true">Iniciar sesión</button>
+                <button type="button" id="acceso-tab-registro" class="acceso-tab" role="tab" aria-selected="false">Crear cuenta</button>
+            </div>
+
+            <form id="acceso-form" class="acceso-form">
                 <div class="form-group">
-                    <label for="auth-username">Usuario</label>
-                    <input type="text" id="auth-username" placeholder="Tu nombre de usuario" autocomplete="username" required>
+                    <label for="acceso-usuario">Usuario</label>
+                    <input type="text" id="acceso-usuario" placeholder="Tu nombre de usuario" autocomplete="username" required>
                 </div>
                 <div class="form-group">
-                    <label for="auth-password">Contraseña</label>
-                    <input type="password" id="auth-password" placeholder="Mínimo 8 caracteres" autocomplete="current-password" required>
+                    <label for="acceso-clave">Contraseña</label>
+                    <input type="password" id="acceso-clave" placeholder="Mínimo 8 caracteres" autocomplete="current-password" required>
                 </div>
-                <p id="auth-message" class="auth-message" hidden></p>
-                <button type="submit" id="auth-submit">Entrar</button>
+                <p id="acceso-mensaje" class="auth-message" hidden></p>
+                <button type="submit" id="acceso-enviar">Entrar</button>
             </form>
-            <p class="auth-toggle">
-                <span id="auth-toggle-text">¿No tienes cuenta?</span>
-                <a id="auth-toggle-link" href="#">Crear usuario</a>
+
+            <p class="acceso-invitado">
+                <a id="acceso-sin-cuenta" href="#">Entrar sin cuenta</a>
             </p>
+            <p class="acceso-nota">Tus datos se guardan solo en este navegador.</p>
         </div>
     </div>
 
