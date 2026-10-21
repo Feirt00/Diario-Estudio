@@ -10,6 +10,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 - Sigue abierto **por diseño y sin arreglo posible** sin backend: C1/C2 (rate limit reseteable), C7 (la sesión no caduca), C8 (la app no está protegida), B3 residual (suplantar a un usuario que sí existe).
 - Tres pestañas (Diario, Cronómetro, Gráficos) y apartado "🤖 Agentes" (array `AGENTS` en `app.js`).
 - Claves en localStorage (prefijo `diario-estudio-`): `sesiones`, `sesiones-<usuario>`, `tema`, `usuarios`, `sesion`, `login-intentos`, `cronometro`. Sin prefijo es un error.
+- **El panel «🤖 Agentes» se quitó de la interfaz** a petición de Feirt (no se veía bien en la web): se borraron su bloque de `index.html`, el array `AGENTS`, `renderAgents()`, su constante `agentList` y todo su CSS. El equipo de agentes **solo vive en `manageste.md` y `AGENTS.md`**: no lo vuelvas a pintar en la app.
 - Versionado: rama `master` → `https://github.com/Feirt00/Agentes.git`, **ya subida** (sincronizada en v1.8) junto con la rama `agentes-de-la-web` (copia del mismo punto, creada a petición de Feirt para tener el proyecto web aparte). En ese repo `main` es otra cosa: no mezclarla ni borrarla.
 
 ## Decisiones (y por qué)

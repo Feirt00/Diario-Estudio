@@ -8,7 +8,6 @@ const streakDisplay = document.getElementById('streak');
 const bestStreakDisplay = document.getElementById('best-streak');
 const weekMinutesDisplay = document.getElementById('week-minutes');
 const sessionList = document.getElementById('session-list');
-const agentList = document.getElementById('agent-list');
 const themeToggle = document.getElementById('theme-toggle');
 const timerDisplay = document.getElementById('timer-display');
 const timerTotal = document.getElementById('timer-total');
@@ -643,53 +642,6 @@ function refreshCurrentUserViews()
     if (typeof renderCharts === 'function')
     {
         renderCharts();
-    }
-}
-
-// Los agentes del proyecto: quién es y qué está haciendo.
-// El reparto detallado y el protocolo de delegación están en `manageste.md`.
-const AGENTS = [
-    { name: 'Zeirt', role: 'Agente principal', task: 'Verifica, integra y documenta', status: 'terminado' },
-    { name: 'Guardian de los Datos', role: 'Agente 1', task: 'Sesiones por usuario y migración', status: 'terminado' },
-    { name: 'Criptógrafo del Acceso', role: 'Agente 2', task: 'Hash, contraseñas y sesión', status: 'terminado' },
-    { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'terminado' },
-    { name: 'Analista de Datos', role: 'Agente 4', task: 'Ventana de días y detalle por día', status: 'terminado' }
-];
-
-// Pintar el apartado de agentes
-function renderAgents()
-{
-    if (!agentList) return;
-
-    agentList.textContent = '';
-
-    for (const agent of AGENTS)
-    {
-        const item = document.createElement('li');
-        item.className = 'agent-item';
-
-        const name = document.createElement('span');
-        name.className = 'agent-name';
-        name.textContent = agent.name;
-
-        const role = document.createElement('span');
-        role.className = 'agent-role';
-        role.textContent = agent.role;
-
-        const task = document.createElement('span');
-        task.className = 'agent-task';
-        task.textContent = agent.task;
-
-        const status = document.createElement('span');
-        status.className = 'agent-status ' + agent.status;
-        status.textContent = agent.status;
-
-        item.appendChild(name);
-        item.appendChild(role);
-        item.appendChild(task);
-        item.appendChild(status);
-
-        agentList.appendChild(item);
     }
 }
 
@@ -3073,7 +3025,6 @@ renderAuthStatus();
 // Un solo repintado: racha, mejor racha, total de la semana, lista y gráficos.
 refreshCurrentUserViews();
 
-renderAgents();
 restoreTimer();
 showTab('diario');
 

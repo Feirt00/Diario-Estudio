@@ -219,3 +219,4 @@ mostrar **hoy**, **lo que se estudió en el día elegido** (la barra pulsada en 
 | 2026-10-21 | Fase 4 (arreglos de los hallazgos) | Zeirt: los 9 hallazgos cerrados y comprobados; commit `v1.6` |
 | 2026-10-21 | Fase 5 (datos por usuario + gráficos navegables) | Agente 1 (sesiones por cuenta) y Agente 4 (ventana de días + detalle), Zeirt verificando e integrando |
 | 2026-10-21 | Fase 6 (filtros de periodo) | Agente 1 (filtro de la lista) y Agente 4 (filtro del pastel) en paralelo, Agente 3 (Inspector) con veredicto **GO** y Zeirt integrando; batería v18 en verde |
+| 2026-10-21 | Limpieza (panel «🤖 Agentes» fuera de la interfaz) | Zeirt: borrado el bloque de `index.html`, el array `AGENTS`, `renderAgents()`, su constante y todo su CSS. Sin restos (grep a 0) y la app comprobada con 0 excepciones. El equipo solo vive en `manageste.md` y `AGENTS.md` |
