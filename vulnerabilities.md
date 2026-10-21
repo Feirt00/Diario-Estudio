@@ -16,6 +16,9 @@ Auditoría de seguridad de la app local (`index.html` + `app.js` + `styles.css`)
   como aceptadas.
 - **Nada de esto se ha arreglado todavía.** Este archivo es el informe; los arreglos van en tareas
   aparte.
+- **Actualización 2026-10-21 (fase 2):** los arreglos ya están aplicados y las 28 pruebas se repitieron
+  sobre la app nueva. Ver la sección **"Estado tras los arreglos"**, más abajo. Este informe conserva
+  la foto del estado original.
 
 ---
 
@@ -53,6 +56,61 @@ Auditoría de seguridad de la app local (`index.html` + `app.js` + `styles.css`)
 
 **Resultado global: la app aguanta bien el XSS (lo importante) y flojea en el manejo de datos y en
 la autenticación.** Lo que más pesa: B1, B3, C1, C4 y C5.
+
+---
+
+## Estado tras los arreglos (fase 2)
+
+Los arreglos se hicieron con un equipo de tres agentes (cada uno con su zona de código reservada; el
+padre, Zeirt, revisó el diff y repitió las pruebas). El reparto está en `manageste.md`.
+
+Después se repitieron las 28 pruebas sobre la app ya arreglada. **Cómo se comprobó:** la app servida
+por HTTP **sin caché** (`Cache-Control: no-store`). Importante: con el `python -m http.server` a secas
+el navegador entrega el `app.js` viejo y las pruebas mienten; a la primera pasó eso y el error apuntaba
+a una línea que ya no existía.
+
+| # | Prueba | Antes | Ahora | Evidencia |
+|---|--------|-------|-------|-----------|
+| A1 | XSS en el campo "Tema" | Seguro | **Seguro** | `<img src=x onerror=...>` → 0 imágenes inyectadas, 0 ejecuciones, el payload sale como texto |
+| A2 | XSS en el nombre de usuario | Seguro | **Seguro** | sin cambios |
+| A3 | `innerHTML` vivo | Baja | **Cerrado** | ya no queda ningún `innerHTML`: `grep` solo lo encuentra dentro de un comentario |
+| A4 | XSS inyectado en `localStorage` | Seguro | **Seguro** | `<svg onload=...>` → 0 svg, 0 ejecuciones |
+| A5 | `href`/`src` con datos del usuario | Seguro | **Seguro** | sin cambios |
+| B1 | JSON corrupto | Media | **Cerrado** | `{roto` en la clave → la app **arranca** (racha viva), avisa por consola y el siguiente guardado funciona |
+| B2 | Tipos de datos raros | Media | **Cerrado** | 10 sesiones corruptas a la vez → solo se pintan las 2 válidas, sin `Invalid Date`, sin `Infinity`, sin `TypeError` |
+| B3 | Suplantación de sesión | Media | **Cerrado (a medias)** | sesión de un usuario inexistente → se borra y se sigue sin sesión. **Sigue siendo posible suplantar a un usuario que sí existe**: sin backend no hay arreglo real |
+| B4 | Cuota de `localStorage` | Baja | **Cerrado** | cuota simulada → mensaje rojo en la página, la sesión no se guarda **y no se pierde lo escrito** |
+| B5 | Prototype pollution | Seguro | **Seguro** | sin cambios |
+| B6 | Sin CSP | Media | **Cerrado** | meta CSP en `index.html`, verificada en `file://` con Chrome headless: el JS sigue corriendo |
+| C1 | Bypass del rate limit | Media | **Abierto por diseño** | sin servidor no hay arreglo; queda documentado como limitación aceptada |
+| C2 | El rate limit es local | Info | **Abierto por diseño** | ídem |
+| C3 | Enumeración de usuarios | Baja | **Cerrado** | el registro ya no confirma si el nombre existe; el login sigue con el mensaje genérico |
+| C4 | Colisión del hash | Media | **Cerrado** | la contraseña que colisionaba ya **no** entra: PBKDF2 con salt aleatorio por usuario |
+| C5 | Crack offline | Media | **Cerrado** | hash de 64 hex + salt de 32 hex por usuario, ~30 ms por hash (antes, instantáneo) |
+| C6 | Contraseñas flojas | Baja | **Cerrado** | mínimo 8, máximo 128 y 15 contraseñas comunes rechazadas |
+| C7 | La sesión no caduca | Info | **Abierto por diseño** | ídem |
+| C8 | La app no está protegida | Info | **Abierto por diseño** | ídem |
+| D1 | Fechas futuras | Seguro | **Seguro** | sin cambios |
+| D2 | Minutos negativos | Baja | **Cerrado** | 30 min y −500 min → el total de la semana es **30**, no −470 |
+| D3 | Minutos como texto | Seguro | **Seguro** | sin cambios (sigue aceptándolos y normalizándolos) |
+| D4 | Duplicar sesiones del mismo día | Info | **Limitación asumida** | documentada: la racha cuenta 1 día, los minutos suman cada sesión |
+| D5 | Editar datos a mano | Seguro | **Seguro** | sin cambios |
+| E1 | `Escape` no cierra el modal | Info | **Cerrado** | `Escape` cierra el modal y el foco vuelve al elemento que lo abrió |
+| E2 | `alert()` en las validaciones | Info | **Cerrado** | ya no hay `alert()`: el aviso sale en `#form-message` |
+| E3 | Sin `autocomplete` | Info | **Cerrado** | `username` / `current-password` / `new-password` según el modo del modal |
+
+**Lo que sigue abierto** (C1, C2, C7, C8 y el resto de B3) **no tiene arreglo real sin backend**, así que
+no se ha disfrazado con seguridad falsa: está escrito como limitación aceptada en `AGENTS.md`.
+
+### Cambios de formato de datos (compatibles)
+- El usuario ahora lleva `salt` (`{ username, usernameKey, passwordHash, salt, createdAt }`).
+- Las cuentas viejas (sin `salt`) **siguen entrando**: se validan con el hash antiguo y se re-hashean
+  solas con PBKDF2 en el primer login correcto. Comprobado.
+- Las sesiones siguen igual: `{ date, topic, minutes }`.
+
+### Lo que se añadió además
+- Sección "🤖 Agentes" en la app: muestra el equipo y qué hace cada uno (`manageste.md`).
+- `manageste.md`: estructura de delegación, zonas reservadas y protocolo.
 
 ---
 
@@ -351,6 +409,10 @@ Lo que **sí** se puede arreglar, en este orden:
 
 ## Pendiente
 
-- [ ] Decidir qué se arregla y en qué tarea (esto no se ha tocado: el proyecto sigue igual).
-- [ ] Mover a `AGENTS.md` las reglas permanentes que salgan de aquí.
-- [ ] Repetir estas pruebas después de los arreglos (la lista de arriba sirve de checklist).
+- [x] Decidir qué se arregla y en qué tarea → **hecho en la fase 2** (agentes 1, 2 y 3 + Zeirt).
+- [x] Mover a `AGENTS.md` las reglas permanentes que salgan de aquí → **hecho**: validación al leer de
+      `localStorage`, PBKDF2 con salt, CSP con `file:`, y el bloque de limitaciones aceptadas.
+- [x] Repetir estas pruebas después de los arreglos → **hecho**: tabla de arriba.
+- [ ] Cerrar los hallazgos nuevos que encontró el Inspector (Agente 3) en la fase 3.
+- [ ] Decidir si las sesiones se separan por usuario (hoy la lista es global).
+- [ ] Decidir si se documenta el bloque de Términos y Condiciones de `index.html`.

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file:; img-src 'self' data:; object-src 'none'; base-uri 'none'">
     <title>Diario de Estudio</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -45,11 +46,22 @@
                 <input type="number" id="minutes" min="1" placeholder="30" required>
             </div>
             <button type="submit">Registrar sesión</button>
+            <p id="form-message" class="form-message" hidden></p>
         </form>
 
         <!-- Lista de sesiones -->
         <h2>Sesiones</h2>
         <ul id="session-list"></ul>
+
+        <!-- Agentes -->
+        <div class="agents">
+            <h2>🤖 Agentes</h2>
+            <ul id="agent-list" class="agent-list"></ul>
+            <p class="agents-note">
+                Cada agente tiene una zona de código reservada y no toca la de los demás.
+                El protocolo de delegación está en <code>manageste.md</code>.
+            </p>
+        </div>
 
         <!-- Términos y Condiciones -->
         <div class="terms">
@@ -70,11 +82,11 @@
             <form id="auth-form">
                 <div class="form-group">
                     <label for="auth-username">Usuario</label>
-                    <input type="text" id="auth-username" placeholder="Tu nombre de usuario" required>
+                    <input type="text" id="auth-username" placeholder="Tu nombre de usuario" autocomplete="username" required>
                 </div>
                 <div class="form-group">
                     <label for="auth-password">Contraseña</label>
-                    <input type="password" id="auth-password" placeholder="Mínimo 6 caracteres" required>
+                    <input type="password" id="auth-password" placeholder="Mínimo 8 caracteres" autocomplete="current-password" required>
                 </div>
                 <p id="auth-message" class="auth-message" hidden></p>
                 <button type="submit" id="auth-submit">Entrar</button>

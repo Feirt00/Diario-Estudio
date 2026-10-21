@@ -11,6 +11,7 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - HTML, CSS y JavaScript puros: sin frameworks, librerías, npm, bundler ni build.
 - `index.html` (estructura), `styles.css` (estilos), `app.js` (lógica y datos).
 - Debe funcionar abriendo `index.html` con doble clic (`file://`): nada de módulos ES (`type="module"`), `fetch` a archivos locales ni nada que requiera servidor.
+- Hay una CSP en `<head>` (`default-src 'self' file:; ...`). El `file:` está porque en `file://` el origen es opaco y `'self'` solo bloquearía el propio `app.js`. Si añades un recurso externo, actualiza la CSP y vuelve a comprobar que la app abre con doble clic.
 - los comandos o bn elcodgio tene que tener la siguiente estructura para qeu se vea mas prolijo 
 --nombre de la variable 
 {
@@ -28,16 +29,32 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - localStorage, clave `diario-estudio-sesiones`: array de `{ date: "AAAA-MM-DD", topic, minutes }`.
 - Si cambias la forma de los datos, mantén compatibilidad con lo ya guardado o el usuario perderá sus sesiones.
 - El contenido del usuario **nunca** se pinta con `innerHTML`: usa `createElement` + `textContent`.
+- **Todo lo que lees de `localStorage` se valida antes de usarlo**: puede venir corrupto o manipulado a
+  propósito. Patrón del proyecto: `normalizeSession()` filtra lo que no tenga la forma esperada y
+  `loadSessions()` nunca lanza. Si añades un dato nuevo, valídalo con el mismo patrón.
+- Los errores al leer o guardar se avisan **en la interfaz**, nunca con `alert()` ni solo por consola:
+  `saveSessions()` devuelve `{ ok, message }` y el mensaje se pinta en `#form-message`.
 
 ## Autenticación (solo local, sin backend)
 - No hay servidor ni base de datos: usuarios y sesión viven en `localStorage`.
-- Claves: `diario-estudio-usuarios` (array de `{ username, usernameKey, passwordHash, createdAt }`), `diario-estudio-sesion` (sesión activa) y `diario-estudio-login-intentos` (rate limit).
-- Las contraseñas se guardan hasheadas, nunca en claro. El hash es **simple y no criptográfico** (FNV-1a con salt fijo + usuario): sirve para no dejar la contraseña legible, no como seguridad real. No prometas lo que no es.
+- Claves: `diario-estudio-usuarios` (array de `{ username, usernameKey, passwordHash, salt, createdAt }`), `diario-estudio-sesion` (sesión activa) y `diario-estudio-login-intentos` (rate limit).
+- Las contraseñas se guardan hasheadas, nunca en claro. El hash es **PBKDF2-HMAC-SHA256** con 210.000 iteraciones y **salt aleatorio por usuario** (campo `salt`), vía Web Crypto API. Si `crypto.subtle` no está disponible, se avisa y **no** se cae a un hash débil.
+- `hashPassword()`, `registerUser()` y `loginUser()` son **asíncronas**: quien las llama usa `await`.
+- Las cuentas anteriores a PBKDF2 (sin `salt`) siguen entrando: se validan con `hashPasswordLegacy()` y
+  se re-hashean solas en el primer login correcto. No borres `hashPasswordLegacy()` sin un plan de migración.
+- Contraseñas: mínimo 8 caracteres, máximo 128 y lista de contraseñas comunes rechazadas.
 - `usernameKey` es el nombre en minúsculas y sin espacios: dos usuarios que solo se diferencian en mayúsculas o espacios son el mismo.
 - Login fallido devuelve siempre el mismo mensaje genérico para no revelar qué usuarios existen.
 - Rate limit local: 5 intentos fallidos → 30 s de bloqueo en el que **ni un login correcto entra**. El bloqueo vive en `loginUser()`, no en el evento del formulario; se resetea al iniciar sesión.
+- La sesión se valida al arrancar (`validateSession()`): si el usuario no existe o el formato es raro, se borra y se sigue sin sesión.
 - La app **no** está protegida: se puede usar sin iniciar sesión. El login solo identifica al usuario.
 - Las validaciones viven en `registerUser()` / `loginUser()`, que devuelven `{ ok, message }` y nunca lanzan errores. Quien llama solo muestra el mensaje.
+
+### Limitaciones aceptadas (sin backend no hay arreglo real)
+No las maquilles con seguridad falsa: documéntalas y ya está.
+- El rate limit vive en `localStorage`: se puede resetear borrando `diario-estudio-login-intentos` y no cubre otros navegadores.
+- La sesión no se puede firmar: sin servidor, suplantar a un usuario **que sí existe** sigue siendo posible.
+- La sesión no caduca y la app no está protegida: el login identifica, no bloquea.
 
 ## Fechas y racha (fácil equivocarse)
 - Trabaja siempre con la fecha local del usuario. Nunca uses `toISOString()` ni `new Date("AAAA-MM-DD")`: se interpretan en UTC y desplazan el día.
@@ -52,6 +69,13 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
 - Cambios pequeños y enfocados; no reescribas lo que ya funciona.
 - Al terminar, resume qué has cambiado y cualquier decisión que deba revisar.
+
+## Equipo de agentes
+- El proyecto se trabaja con un equipo de agentes: **Zeirt** (agente principal, el padre) delega, revisa y
+  entrega; los agentes 1-3 tienen zonas de código reservadas y no tocan la de los demás.
+- El reparto, el protocolo de delegación y el estado de cada uno están en **`manageste.md`**: léelo antes de
+  tocar nada y actualiza el estado al terminar tu parte.
+- Regla de oro: si necesitas tocar la zona de otro agente, **no lo hagas**: anótalo en tu informe y lo decide Zeirt.
 
 ## Memoria
 - Al empezar, lee `MEMORY.md` para conocer el estado del proyecto y las decisiones tomadas.
@@ -70,3 +94,7 @@ Web estática para registrar sesiones de estudio y motivarse viendo la racha de 
 - No hay tests ni lint. Probar abriendo `index.html` en el navegador.
 - Total de la semana: registrar una sesión de hoy debe subir el total; una de la semana pasada o de mañana no deben cambiarlo.
 - Para empezar de cero: DevTools → Application → Local Storage → borrar la clave `diario-estudio-sesiones`.
+- La auditoría de seguridad y el estado de cada prueba están en **`vulnerabilities.md`**: antes de tocar el
+  acceso o los datos, léela, y si cambias algo, deja la prueba correspondiente al día.
+- Para probar en un navegador automatizado, sirve la carpeta por HTTP **sin caché** (`Cache-Control: no-store`):
+  si el navegador sirve el `app.js` viejo, la prueba miente.

@@ -382,6 +382,40 @@ button[type="submit"]:hover
     background: #5a6fd6;
 }
 
+/* Mensaje del formulario (error o confirmación) */
+.form-message
+{
+    font-size: 0.85em;
+    margin-top: 12px;
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.form-message.error
+{
+    background: #ffe0e0;
+    color: #b30000;
+}
+
+.form-message.success
+{
+    background: #e0ffe0;
+    color: #006600;
+}
+
+body.dark .form-message.error
+{
+    background: #4a1f1f;
+    color: #ffb3b3;
+}
+
+body.dark .form-message.success
+{
+    background: #1f4a2a;
+    color: #b3ffb3;
+}
+
 /* Lista de sesiones */
 #session-list
 {
@@ -475,4 +509,122 @@ body.dark .terms h3
 body.dark .terms p
 {
     color: #555;
+}
+
+/* Apartado de agentes */
+.agents
+{
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+body.dark .agents
+{
+    border-top-color: #0f3460;
+}
+
+.agents h2
+{
+    font-size: 1.1em;
+    margin-bottom: 12px;
+}
+
+.agent-list
+{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.agent-item
+{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    font-size: 0.85em;
+}
+
+body.dark .agent-item
+{
+    border-color: #0f3460;
+}
+
+.agent-name
+{
+    font-weight: bold;
+    color: #333;
+}
+
+body.dark .agent-name
+{
+    color: #ddd;
+}
+
+.agent-role
+{
+    color: #999;
+}
+
+.agent-task
+{
+    flex: 1;
+    color: #666;
+}
+
+body.dark .agent-task
+{
+    color: #888;
+}
+
+.agent-status
+{
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.8em;
+    text-transform: capitalize;
+    background: #eee;
+    color: #666;
+}
+
+body.dark .agent-status
+{
+    background: #0f3460;
+    color: #aaa;
+}
+
+.agent-status.trabajando
+{
+    background: #fff3cd;
+    color: #856404;
+}
+
+.agent-status.terminado
+{
+    background: #d4edda;
+    color: #155724;
+}
+
+body.dark .agent-status.trabajando
+{
+    background: #4a3c00;
+    color: #ffe08a;
+}
+
+body.dark .agent-status.terminado
+{
+    background: #0d3b1d;
+    color: #9ae6b4;
+}
+
+.agents-note
+{
+    font-size: 0.8em;
+    color: #999;
+    line-height: 1.4;
 }

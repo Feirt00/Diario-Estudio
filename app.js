@@ -3,10 +3,12 @@ const form = document.getElementById('study-form');
 const dateInput = document.getElementById('date');
 const topicInput = document.getElementById('topic');
 const minutesInput = document.getElementById('minutes');
+const formMessage = document.getElementById('form-message');
 const streakDisplay = document.getElementById('streak');
 const bestStreakDisplay = document.getElementById('best-streak');
 const weekMinutesDisplay = document.getElementById('week-minutes');
 const sessionList = document.getElementById('session-list');
+const agentList = document.getElementById('agent-list');
 const themeToggle = document.getElementById('theme-toggle');
 const authStatus = document.getElementById('auth-status');
 const authModal = document.getElementById('auth-modal');
@@ -28,12 +30,43 @@ const SESSION_KEY = 'diario-estudio-sesion';
 const ATTEMPTS_KEY = 'diario-estudio-login-intentos';
 
 // Ajustes del acceso
-const SALT = 'diario-estudio-v1';
 const MAX_ATTEMPTS = 5;
 const BLOCK_SECONDS = 30;
-const MIN_PASSWORD = 6;
+const MIN_PASSWORD = 8;
+const MAX_PASSWORD = 128;
 const MIN_USERNAME = 3;
 const MAX_USERNAME = 20;
+
+// Parámetros del hash de contraseñas: PBKDF2 con SHA-256 y salt aleatorio por usuario.
+// 210.000 iteraciones hacen lento un ataque con diccionario aunque alguien se
+// lleve el almacenamiento del navegador.
+const PBKDF2_ITERATIONS = 210000;
+const PBKDF2_HASH = 'SHA-256';
+const PBKDF2_KEY_BITS = 256;
+const SALT_BYTES = 16;
+
+// Salt del hash antiguo (FNV-1a). Solo lo usa hashPasswordLegacy() para poder
+// validar las cuentas creadas antes de que existiera PBKDF2.
+const LEGACY_SALT = 'diario-estudio-v1';
+
+// Contraseñas muy comunes: se rechazan al crear una cuenta.
+const COMMON_PASSWORDS = [
+    '123456',
+    '12345678',
+    '123456789',
+    '1234567890',
+    'password',
+    'contraseña',
+    'qwerty',
+    'qwerty123',
+    'abc123',
+    '111111',
+    '000000',
+    '123123',
+    'admin123',
+    'iloveyou',
+    'letmein'
+];
 
 // Obtener fecha de hoy en formato local (YYYY-MM-DD)
 function getTodayLocal()
@@ -48,9 +81,15 @@ function parseLocalDate(dateStr)
     return new Date(year, month - 1, day);
 }
 
-// Formatear fecha para mostrar
+// Formatear fecha para mostrar.
+// Si la fecha no es válida se avisa con un texto legible, nunca con "Invalid Date".
 function formatDate(dateStr)
 {
+    if (!isValidDateString(dateStr))
+    {
+        return 'Fecha inválida';
+    }
+
     const date = parseLocalDate(dateStr);
     return date.toLocaleDateString('es-ES', {
         weekday: 'short',
@@ -68,17 +107,100 @@ function toLocalDateString(date)
     return `${year}-${month}-${day}`;
 }
 
-// Cargar sesiones desde localStorage
-function loadSessions()
+// Comprobar que una fecha es un texto AAAA-MM-DD que existe en el calendario
+function isValidDateString(dateStr)
 {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (typeof dateStr !== 'string') return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+
+    const date = parseLocalDate(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    // "2026-02-30" se convertiría en 2 de marzo: al volver no coincide con el texto
+    return toLocalDateString(date) === dateStr;
 }
 
-// Guardar sesiones en localStorage
+// Normalizar una sesión guardada.
+// Devuelve { date, topic, minutes } si la sesión tiene la forma esperada,
+// o null si está corrupta y hay que descartarla.
+// Los minutos pueden venir como texto (de cuando se guardaban así):
+// se aceptan si son un número válido y se dejan como número.
+function normalizeSession(session)
+{
+    if (!session || typeof session !== 'object' || Array.isArray(session)) return null;
+    if (!isValidDateString(session.date)) return null;
+    if (typeof session.topic !== 'string') return null;
+    if (typeof session.minutes !== 'number' && typeof session.minutes !== 'string') return null;
+    if (typeof session.minutes === 'string' && session.minutes.trim() === '') return null;
+
+    const minutes = Number(session.minutes);
+    if (!isFinite(minutes)) return null;
+
+    return { date: session.date, topic: session.topic, minutes: minutes };
+}
+
+// Cargar sesiones desde localStorage.
+// Nunca falla: si el JSON está corrupto o una sesión no tiene la forma
+// esperada, esa sesión se descarta y la app sigue funcionando.
+function loadSessions()
+{
+    let parsed;
+
+    try
+    {
+        const data = localStorage.getItem(STORAGE_KEY);
+        parsed = data ? JSON.parse(data) : [];
+    }
+    catch (error)
+    {
+        console.warn('No se pudieron leer las sesiones guardadas:', error);
+        return [];
+    }
+
+    if (!Array.isArray(parsed))
+    {
+        console.warn('Las sesiones guardadas no son una lista: se ignoran.');
+        return [];
+    }
+
+    const sessions = [];
+    for (const session of parsed)
+    {
+        const valid = normalizeSession(session);
+        if (valid)
+        {
+            sessions.push(valid);
+        }
+        else
+        {
+            console.warn('Se descartó una sesión con datos inválidos:', session);
+        }
+    }
+
+    return sessions;
+}
+
+// Guardar sesiones en localStorage.
+// Devuelve { ok, message } y nunca lanza errores: si el navegador rechaza
+// la escritura (cuota llena, almacenamiento bloqueado) se avisa con un mensaje.
 function saveSessions(sessions)
 {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    try
+    {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+        return { ok: true, message: '' };
+    }
+    catch (error)
+    {
+        console.warn('No se pudieron guardar las sesiones:', error);
+
+        const isQuotaExceeded = error && error.name === 'QuotaExceededError';
+        const message = isQuotaExceeded
+            ? 'No se pudo guardar la sesión: el almacenamiento del navegador está lleno. Borra sesiones antiguas o libera espacio.'
+            : 'No se pudo guardar la sesión en este navegador.';
+
+        return { ok: false, message: message };
+    }
 }
 
 // Calcular racha actual
@@ -188,18 +310,24 @@ function getWeekStart()
 
 // Calcular los minutos estudiados esta semana (del lunes a hoy).
 // Las fechas ya vienen en AAAA-MM-DD, así que se comparan como texto.
+// Los minutos negativos o no finitos no cuentan: el total nunca sale negativo.
 function calculateWeekMinutes(sessions)
 {
+    if (!Array.isArray(sessions)) return 0;
+
     const weekStart = getWeekStart();
     const today = getTodayLocal();
 
     let total = 0;
     for (const session of sessions)
     {
-        if (session.date >= weekStart && session.date <= today)
-        {
-            total += Number(session.minutes);
-        }
+        if (!session || typeof session.date !== 'string') continue;
+        if (session.date < weekStart || session.date > today) continue;
+
+        const minutes = Number(session.minutes);
+        if (!isFinite(minutes) || minutes < 0) continue;
+
+        total += minutes;
     }
     return total;
 }
@@ -223,6 +351,14 @@ function updateWeekTotal()
     weekMinutesDisplay.textContent = calculateWeekMinutes(sessions);
 }
 
+// Mostrar los minutos de una sesión (si no son válidos, se muestran como 0)
+function formatMinutes(minutes)
+{
+    const value = Number(minutes);
+    if (!isFinite(value)) return '0 min';
+    return value + ' min';
+}
+
 // Crear el <li> de una sesión. Los datos van con textContent para que
 // un tema con "<" o comillas no rompa el HTML.
 function createSessionItem(session)
@@ -235,11 +371,11 @@ function createSessionItem(session)
 
     const topic = document.createElement('span');
     topic.className = 'session-topic';
-    topic.textContent = session.topic;
+    topic.textContent = typeof session.topic === 'string' ? session.topic : '';
 
     const minutes = document.createElement('span');
     minutes.className = 'session-minutes';
-    minutes.textContent = session.minutes + ' min';
+    minutes.textContent = formatMinutes(session.minutes);
 
     item.appendChild(date);
     item.appendChild(topic);
@@ -273,6 +409,68 @@ function updateSessionList()
     }
 }
 
+// Los agentes del proyecto: quién es y qué está haciendo.
+// El reparto detallado y el protocolo de delegación están en `manageste.md`.
+const AGENTS = [
+    { name: 'Zeirt', role: 'Agente principal', task: 'Verifica, integra y documenta', status: 'trabajando' },
+    { name: 'Guardian de los Datos', role: 'Agente 1', task: 'Robustez de datos y validaciones', status: 'terminado' },
+    { name: 'Criptógrafo del Acceso', role: 'Agente 2', task: 'Hash, contraseñas y sesión', status: 'terminado' },
+    { name: 'Inspector', role: 'Agente 3', task: 'Verificación y pruebas nuevas', status: 'pendiente' }
+];
+
+// Pintar el apartado de agentes
+function renderAgents()
+{
+    if (!agentList) return;
+
+    agentList.textContent = '';
+
+    for (const agent of AGENTS)
+    {
+        const item = document.createElement('li');
+        item.className = 'agent-item';
+
+        const name = document.createElement('span');
+        name.className = 'agent-name';
+        name.textContent = agent.name;
+
+        const role = document.createElement('span');
+        role.className = 'agent-role';
+        role.textContent = agent.role;
+
+        const task = document.createElement('span');
+        task.className = 'agent-task';
+        task.textContent = agent.task;
+
+        const status = document.createElement('span');
+        status.className = 'agent-status ' + agent.status;
+        status.textContent = agent.status;
+
+        item.appendChild(name);
+        item.appendChild(role);
+        item.appendChild(task);
+        item.appendChild(status);
+
+        agentList.appendChild(item);
+    }
+}
+
+// Mostrar un mensaje junto al formulario (error o confirmación)
+// Se usa en vez de alert() para que el aviso se vea en la propia página.
+function showFormMessage(text, type)
+{
+    if (!text)
+    {
+        formMessage.hidden = true;
+        formMessage.textContent = '';
+        return;
+    }
+
+    formMessage.hidden = false;
+    formMessage.textContent = text;
+    formMessage.className = 'form-message ' + type;
+}
+
 // Manejar envío del formulario
 form.addEventListener('submit', (e) =>
 {
@@ -282,15 +480,24 @@ form.addEventListener('submit', (e) =>
     const topic = topicInput.value.trim();
     const minutes = parseInt(minutesInput.value);
 
-    if (!date || !topic || !minutes || minutes <= 0)
+    if (!isValidDateString(date) || !topic || !minutes || minutes <= 0)
     {
-        alert('Por favor, completa todos los campos correctamente.');
+        showFormMessage('Por favor, completa todos los campos correctamente.', 'error');
         return;
     }
 
     const sessions = loadSessions();
     sessions.push({ date, topic, minutes });
-    saveSessions(sessions);
+
+    const result = saveSessions(sessions);
+    if (!result.ok)
+    {
+        // La sesión no se ha guardado: se avisa y no se borra lo que se ha escrito
+        showFormMessage(result.message, 'error');
+        return;
+    }
+
+    showFormMessage('Sesión registrada.', 'success');
 
     topicInput.value = '';
     minutesInput.value = '';
@@ -334,11 +541,92 @@ function usernameKey(username)
     return username.trim().toLowerCase();
 }
 
-// Hash sencillo de la contraseña. No es criptografía real:
-// solo evita que la contraseña se lea en claro al abrir el navegador.
-function hashPassword(usernameKeyValue, password)
+// Pasar bytes a texto hexadecimal (para guardar el salt y el hash)
+function bytesToHex(bytes)
 {
-    const text = SALT + usernameKeyValue + password;
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++)
+    {
+        hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return hex;
+}
+
+// Pasar texto hexadecimal a bytes (para usar el salt en PBKDF2)
+function hexToBytes(hex)
+{
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++)
+    {
+        bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return bytes;
+}
+
+// ¿Está disponible la Web Crypto API? Sin ella no se puede hashear de forma segura.
+function isCryptoAvailable()
+{
+    return typeof crypto !== 'undefined'
+        && typeof crypto.getRandomValues === 'function'
+        && typeof crypto.subtle !== 'undefined'
+        && typeof crypto.subtle.deriveBits === 'function';
+}
+
+// Generar un salt aleatorio para un usuario (en hexadecimal)
+function generateSalt()
+{
+    const bytes = new Uint8Array(SALT_BYTES);
+    crypto.getRandomValues(bytes);
+    return bytesToHex(bytes);
+}
+
+// Hash de la contraseña con PBKDF2 (SHA-256) y el salt del usuario.
+// Es asíncrona porque usa crypto.subtle. Devuelve el hash en hexadecimal,
+// o null si la Web Crypto API no está disponible o algo falla.
+async function hashPassword(password, salt)
+{
+    if (!isCryptoAvailable())
+    {
+        return null;
+    }
+
+    try
+    {
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(password),
+            'PBKDF2',
+            false,
+            ['deriveBits']
+        );
+
+        const bits = await crypto.subtle.deriveBits(
+            {
+                name: 'PBKDF2',
+                salt: hexToBytes(salt),
+                iterations: PBKDF2_ITERATIONS,
+                hash: PBKDF2_HASH
+            },
+            keyMaterial,
+            PBKDF2_KEY_BITS
+        );
+
+        return bytesToHex(new Uint8Array(bits));
+    }
+    catch (error)
+    {
+        return null;
+    }
+}
+
+// Hash ANTIGUO (FNV-1a de 32 bits con salt fijo). No es criptografía: solo evita
+// que la contraseña se lea en claro. Se conserva únicamente para migrar las
+// cuentas ya guardadas: si un usuario no tiene "salt" se compara con este hash
+// y, si la contraseña es correcta, se re-hashea con PBKDF2.
+function hashPasswordLegacy(usernameKeyValue, password)
+{
+    const text = LEGACY_SALT + usernameKeyValue + password;
     let hash = 2166136261;
     for (let i = 0; i < text.length; i++)
     {
@@ -348,10 +636,50 @@ function hashPassword(usernameKeyValue, password)
     return hash.toString(16);
 }
 
+// Comparar dos hashes sin devolver en cuanto un carácter no coincide
+function hashesMatch(hashA, hashB)
+{
+    if (typeof hashA !== 'string' || typeof hashB !== 'string') return false;
+    if (hashA.length !== hashB.length) return false;
+
+    let diff = 0;
+    for (let i = 0; i < hashA.length; i++)
+    {
+        diff |= hashA.charCodeAt(i) ^ hashB.charCodeAt(i);
+    }
+    return diff === 0;
+}
+
+// ¿La contraseña está en la lista de contraseñas muy comunes?
+function isCommonPassword(password)
+{
+    return COMMON_PASSWORDS.indexOf(password.trim().toLowerCase()) !== -1;
+}
+
+// Leer los usuarios guardados. Si el JSON está corrupto se devuelve una lista
+// vacía en vez de romper la app.
 function loadUsers()
 {
     const data = localStorage.getItem(USERS_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+
+    try
+    {
+        const users = JSON.parse(data);
+        if (!Array.isArray(users)) return [];
+
+        // Solo se aceptan registros con los campos mínimos
+        return users.filter(user =>
+            user
+            && typeof user.username === 'string'
+            && typeof user.usernameKey === 'string'
+            && typeof user.passwordHash === 'string'
+        );
+    }
+    catch (error)
+    {
+        return [];
+    }
 }
 
 function saveUsers(users)
@@ -359,10 +687,57 @@ function saveUsers(users)
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
+// Leer la sesión guardada. Devuelve null si no hay o si el JSON está roto.
 function getCurrentUser()
 {
     const data = localStorage.getItem(SESSION_KEY);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+
+    try
+    {
+        return JSON.parse(data);
+    }
+    catch (error)
+    {
+        return null;
+    }
+}
+
+// Comprobar que la sesión guardada es válida: que tenga la forma
+// { username, loggedInAt } y que ese usuario exista en la lista de usuarios.
+// Si no, se borra la sesión y se sigue sin iniciar sesión.
+//
+// LIMITACIÓN HONESTA: sin servidor no hay forma real de FIRMAR la sesión, porque
+// el secreto tendría que estar en el mismo navegador que el atacante. Quien
+// pueda escribir en localStorage puede hacerse pasar por un usuario que SÍ
+// existe. Lo que aquí se evita es mostrar usuarios que no existen (prueba B3).
+function validateSession()
+{
+    const session = getCurrentUser();
+
+    const validShape = session
+        && typeof session === 'object'
+        && typeof session.username === 'string'
+        && session.username.length > 0
+        && typeof session.loggedInAt === 'string'
+        && session.loggedInAt.length > 0;
+
+    if (!validShape)
+    {
+        clearSession();
+        return null;
+    }
+
+    const users = loadUsers();
+    const exists = users.some(user => user.usernameKey === usernameKey(session.username));
+
+    if (!exists)
+    {
+        clearSession();
+        return null;
+    }
+
+    return session;
 }
 
 function setSession(username)
@@ -379,11 +754,30 @@ function clearSession()
 }
 
 // Intentos fallidos de acceso
+//
+// LIMITACIÓN HONESTA (prueba C1): el bloqueo vive en localStorage, que también
+// controla quien quiere saltarse el bloqueo: borrando la clave
+// "diario-estudio-login-intentos" el bloqueo se anula. Sin servidor no hay forma
+// de arreglarlo de verdad, así que esto frena la impaciencia, no la fuerza bruta.
 function loadAttempts()
 {
     const data = localStorage.getItem(ATTEMPTS_KEY);
     if (!data) return { count: 0, blockedUntil: 0 };
-    return JSON.parse(data);
+
+    try
+    {
+        const attempts = JSON.parse(data);
+        if (!attempts || typeof attempts !== 'object') return { count: 0, blockedUntil: 0 };
+
+        return {
+            count: Number(attempts.count) || 0,
+            blockedUntil: Number(attempts.blockedUntil) || 0
+        };
+    }
+    catch (error)
+    {
+        return { count: 0, blockedUntil: 0 };
+    }
 }
 
 function saveAttempts(attempts)
@@ -415,26 +809,36 @@ function clearAttempts()
     saveAttempts({ count: 0, blockedUntil: 0 });
 }
 
-// Mostrar el usuario conectado o el enlace de acceso
+// Mostrar el usuario conectado o el enlace de acceso.
+// Todo se pinta con createElement + textContent: nunca con innerHTML.
 function renderAuthStatus()
 {
-    const user = getCurrentUser();
+    const user = validateSession();
+
+    authStatus.textContent = '';
+
     if (user)
     {
-        authStatus.innerHTML = '';
         const name = document.createElement('span');
         name.className = 'auth-username';
         name.textContent = user.username;
+
         const exit = document.createElement('span');
         exit.className = 'auth-link';
         exit.id = 'logout-link';
         exit.textContent = 'Cerrar sesión';
+
         authStatus.appendChild(name);
         authStatus.appendChild(exit);
     }
     else
     {
-        authStatus.innerHTML = '<span class="auth-link" id="login-link">Iniciar sesión</span>';
+        const login = document.createElement('span');
+        login.className = 'auth-link';
+        login.id = 'login-link';
+        login.textContent = 'Iniciar sesión';
+
+        authStatus.appendChild(login);
     }
 }
 
@@ -468,6 +872,7 @@ function setAuthMode(mode)
         authTitle.textContent = 'Iniciar sesión';
         authSubmit.textContent = 'Entrar';
         authPassword.setAttribute('placeholder', 'Tu contraseña');
+        authPassword.setAttribute('autocomplete', 'current-password');
         authToggleText.textContent = '¿No tienes cuenta?';
         authToggleLink.textContent = 'Crear usuario';
     }
@@ -476,6 +881,7 @@ function setAuthMode(mode)
         authTitle.textContent = 'Crear usuario';
         authSubmit.textContent = 'Crear cuenta';
         authPassword.setAttribute('placeholder', 'Mínimo ' + MIN_PASSWORD + ' caracteres');
+        authPassword.setAttribute('autocomplete', 'new-password');
         authToggleText.textContent = '¿Ya tienes cuenta?';
         authToggleLink.textContent = 'Iniciar sesión';
     }
@@ -506,8 +912,22 @@ function updateRateLimitUI()
     }
 }
 
+// Elemento que tenía el foco antes de abrir el modal (para devolvérselo al cerrar)
+let lastFocusedElement = null;
+
+// Temporizador que cierra el modal tras un acceso correcto
+let authCloseTimer = null;
+
 function openAuthModal(mode)
 {
+    // Si se reabre el modal antes de que se cierre solo, se cancela el cierre automático
+    if (authCloseTimer !== null)
+    {
+        clearTimeout(authCloseTimer);
+        authCloseTimer = null;
+    }
+
+    lastFocusedElement = document.activeElement;
     authModal.hidden = false;
     setAuthMode(mode);
     authUsername.focus();
@@ -515,14 +935,26 @@ function openAuthModal(mode)
 
 function closeAuthModal()
 {
+    if (authCloseTimer !== null)
+    {
+        clearTimeout(authCloseTimer);
+        authCloseTimer = null;
+    }
+
     authModal.hidden = true;
     setAuthMessage('');
+
+    // El foco vuelve al elemento que abrió el modal
+    if (lastFocusedElement && document.contains(lastFocusedElement))
+    {
+        lastFocusedElement.focus();
+    }
 }
 
 // ---------- Acciones ----------
 
 // Devuelve { ok, message }. Nunca lanza errores: siempre un mensaje para el usuario.
-function registerUser(username, password)
+async function registerUser(username, password)
 {
     if (!username || !password)
     {
@@ -540,20 +972,45 @@ function registerUser(username, password)
     {
         return { ok: false, message: 'La contraseña necesita al menos ' + MIN_PASSWORD + ' caracteres.' };
     }
+    if (password.length > MAX_PASSWORD)
+    {
+        return { ok: false, message: 'La contraseña no puede pasar de ' + MAX_PASSWORD + ' caracteres.' };
+    }
+    if (isCommonPassword(password))
+    {
+        return { ok: false, message: 'Esa contraseña es demasiado común. Elige otra más difícil de adivinar.' };
+    }
+
+    // Sin Web Crypto API no se puede proteger la contraseña: no se cae a un hash débil.
+    if (!isCryptoAvailable())
+    {
+        return { ok: false, message: 'Este navegador no permite usar un hash seguro (falta la Web Crypto API). Actualiza el navegador: no se ha creado la cuenta.' };
+    }
 
     const users = loadUsers();
     const key = usernameKey(username);
 
-    const exists = users.some(user => user.usernameKey === key);
-    if (exists)
+    // El mensaje NO confirma si el usuario ya existe (evita enumerar cuentas).
+    // COMPROMISO CON LA USABILIDAD: quien intenta crear una cuenta con un nombre
+    // que ya existe no recibe un aviso claro, solo que pruebe con otro o inicie sesión.
+    if (users.some(user => user.usernameKey === key))
     {
-        return { ok: false, message: 'Ese nombre de usuario ya existe.' };
+        return { ok: false, message: 'No se ha podido crear la cuenta con ese nombre. Prueba con otro o inicia sesión.' };
+    }
+
+    const salt = generateSalt();
+    const passwordHash = await hashPassword(password, salt);
+
+    if (!passwordHash)
+    {
+        return { ok: false, message: 'No se ha podido proteger la contraseña en este navegador. No se ha creado la cuenta.' };
     }
 
     users.push({
         username: username,
         usernameKey: key,
-        passwordHash: hashPassword(key, password),
+        passwordHash: passwordHash,
+        salt: salt,
         createdAt: getTodayLocal()
     });
     saveUsers(users);
@@ -561,7 +1018,8 @@ function registerUser(username, password)
     return { ok: true, message: '¡Cuenta creada! Bienvenido, ' + username + '.' };
 }
 
-function loginUser(username, password)
+// Devuelve { ok, message }. Nunca lanza errores: siempre un mensaje para el usuario.
+async function loginUser(username, password)
 {
     // Bloqueo por intentos: no se comprueba nada mientras dure
     const left = secondsLeftBlocked();
@@ -575,6 +1033,12 @@ function loginUser(username, password)
         return { ok: false, message: 'Completa ambos campos.' };
     }
 
+    // Sin Web Crypto API no se puede comprobar la contraseña: no se cae a un hash débil.
+    if (!isCryptoAvailable())
+    {
+        return { ok: false, message: 'Este navegador no permite usar un hash seguro (falta la Web Crypto API). Actualiza el navegador: no se ha iniciado sesión.' };
+    }
+
     const users = loadUsers();
     const key = usernameKey(username);
     const user = users.find(item => item.usernameKey === key);
@@ -582,15 +1046,53 @@ function loginUser(username, password)
     // Mensaje genérico: no revela si el usuario existe
     const fail = { ok: false, message: 'Usuario o contraseña incorrectos.' };
 
-    if (user && user.passwordHash === hashPassword(key, password))
+    if (!user)
     {
+        registerFailedAttempt();
+        return fail;
+    }
+
+    const salt = typeof user.salt === 'string' ? user.salt : '';
+
+    // Cuenta antigua (hash FNV-1a, sin salt): se valida con el hash viejo y, si la
+    // contraseña es correcta, se re-hashea con PBKDF2 y se guarda el salt nuevo.
+    // Así las cuentas ya creadas siguen entrando (migración silenciosa).
+    if (salt === '')
+    {
+        if (!hashesMatch(user.passwordHash, hashPasswordLegacy(key, password)))
+        {
+            registerFailedAttempt();
+            return fail;
+        }
+
+        const newSalt = generateSalt();
+        const newHash = await hashPassword(password, newSalt);
+
+        if (!newHash)
+        {
+            return { ok: false, message: 'No se ha podido comprobar la contraseña en este navegador. Inténtalo de nuevo.' };
+        }
+
+        user.salt = newSalt;
+        user.passwordHash = newHash;
+        saveUsers(users);
+
         clearAttempts();
         setSession(user.username);
         return { ok: true, message: 'Sesión iniciada.' };
     }
 
-    registerFailedAttempt();
-    return fail;
+    const hash = await hashPassword(password, salt);
+
+    if (!hash || !hashesMatch(user.passwordHash, hash))
+    {
+        registerFailedAttempt();
+        return fail;
+    }
+
+    clearAttempts();
+    setSession(user.username);
+    return { ok: true, message: 'Sesión iniciada.' };
 }
 
 function logoutUser()
@@ -629,24 +1131,36 @@ authToggleLink.addEventListener('click', (e) =>
     setAuthMode(authMode === 'login' ? 'register' : 'login');
 });
 
-authForm.addEventListener('submit', (e) =>
+authForm.addEventListener('submit', async (e) =>
 {
     e.preventDefault();
 
+    // Se bloquea el botón mientras se calcula el hash para no mandar dos veces
+    authSubmit.disabled = true;
+
     const result = authMode === 'register'
-        ? registerUser(authUsername.value.trim(), authPassword.value)
-        : loginUser(authUsername.value.trim(), authPassword.value);
+        ? await registerUser(authUsername.value.trim(), authPassword.value)
+        : await loginUser(authUsername.value.trim(), authPassword.value);
 
     if (result.ok)
     {
         setAuthMessage(result.message, 'success');
         renderAuthStatus();
-        setTimeout(closeAuthModal, 600);
+        authCloseTimer = setTimeout(closeAuthModal, 600);
     }
     else
     {
         setAuthMessage(result.message, 'error');
         updateRateLimitUI();
+    }
+});
+
+// La tecla Escape cierra el modal de acceso
+document.addEventListener('keydown', (e) =>
+{
+    if (e.key === 'Escape' && !authModal.hidden)
+    {
+        closeAuthModal();
     }
 });
 
@@ -662,9 +1176,12 @@ setInterval(() =>
 // Inicializar
 dateInput.value = getTodayLocal();
 loadTheme();
+// Si la sesión guardada no es válida (usuario inexistente o formato raro), se borra
+validateSession();
 renderAuthStatus();
 updateStreak();
 updateBestStreak();
 updateWeekTotal();
 updateSessionList();
+renderAgents();
 
